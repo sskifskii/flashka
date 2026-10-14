@@ -1,0 +1,10 @@
+.env
+bin/
+coverage/
+web/dist/
+web/node_modules/
+web/*.tsbuildinfo
+playwright-report/
+test-results/
+*.log
+.DS_Store

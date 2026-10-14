@@ -1,0 +1,218 @@
+//go:build integration
+
+package httpserver
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/skif/flashka/internal/auth"
+	"github.com/skif/flashka/internal/platform/config"
+)
+
+func TestAuthHTTPContract(t *testing.T) {
+	url := os.Getenv("DATABASE_URL")
+	if url == "" {
+		t.Skip("DATABASE_URL is not set")
+	}
+	pool, err := pgxpool.New(context.Background(), url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	if _, err = pool.Exec(context.Background(), "TRUNCATE folders,auth_sessions,users CASCADE"); err != nil {
+		t.Fatalf("apply migrations first: %v", err)
+	}
+	hasher := auth.PasswordHasher{Memory: 19456, Iterations: 2, Parallelism: 1}
+	dummy, err := hasher.Hash("dummy password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Config{Environment: "development", CookieName: "flashka_session", SessionTTL: time.Hour, LastSeenInterval: time.Minute, ArgonMemory: 19456, ArgonIterations: 2, ArgonParallelism: 1}
+	service := auth.Service{Repo: auth.Repository{Pool: pool}, Hasher: hasher, Tokens: auth.TokenSource{}, Clock: auth.RealClock{}, TTL: cfg.SessionTTL, LastSeen: cfg.LastSeenInterval, DummyHash: dummy}
+	server := httptest.NewUnstartedServer(nil)
+	cfg.TrustedOrigin = "http://" + server.Listener.Addr().String()
+	var logs bytes.Buffer
+	server.Config.Handler = New(cfg, pool, service, slog.New(slog.NewJSONHandler(&logs, nil)))
+	server.Start()
+	defer server.Close()
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	for _, path := range []string{"/health/live", "/health/ready"} {
+		res, err := client.Get(server.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != 200 {
+			t.Fatalf("%s=%d", path, res.StatusCode)
+		}
+		assertSecurityHeaders(t, res.Header)
+	}
+	request := func(method, path string, body any) (int, map[string]any, http.Header) {
+		t.Helper()
+		var content io.Reader
+		if body != nil {
+			encoded, _ := json.Marshal(body)
+			content = bytes.NewReader(encoded)
+		}
+		req, e := http.NewRequest(method, server.URL+path, content)
+		if e != nil {
+			t.Fatal(e)
+		}
+		req.Header.Set("Origin", cfg.TrustedOrigin)
+		if body != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		res, e := client.Do(req)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer res.Body.Close()
+		decoded := map[string]any{}
+		if res.StatusCode != 204 {
+			if e = json.NewDecoder(res.Body).Decode(&decoded); e != nil {
+				t.Fatal(e)
+			}
+		}
+		assertAuthHeaders(t, res.Header)
+		return res.StatusCode, decoded, res.Header
+	}
+	if status, _, _ := request("POST", "/api/v1/auth/register", map[string]string{"login": "ContractUser", "password": "exact password"}); status != 201 {
+		t.Fatalf("register=%d", status)
+	}
+	var passwordHash string
+	if err := pool.QueryRow(context.Background(), `SELECT password_hash FROM users WHERE login_normalized='contractuser'`).Scan(&passwordHash); err != nil {
+		t.Fatal(err)
+	}
+	cookies := jar.Cookies(mustURL(t, server.URL))
+	if len(cookies) == 0 {
+		t.Fatal("session cookie missing")
+	}
+	rawToken := cookies[0].Value
+	if status, body, _ := request("GET", "/api/v1/auth/me", nil); status != 200 || body["user"] == nil {
+		t.Fatalf("me=%d %#v", status, body)
+	}
+	if status, _, _ := request("POST", "/api/v1/auth/logout", nil); status != 204 {
+		t.Fatalf("logout=%d", status)
+	}
+	if status, body, headers := request("GET", "/api/v1/auth/me", nil); status != 401 || errorCode(body) != "unauthenticated" || headers.Get("Set-Cookie") != "" {
+		t.Fatalf("unauthenticated=%d %#v", status, body)
+	}
+	jar.SetCookies(mustURL(t, server.URL), []*http.Cookie{{Name: cfg.CookieName, Value: "broken", Path: "/"}})
+	if status, _, headers := request("GET", "/api/v1/auth/me", nil); status != 401 || headers.Get("Set-Cookie") == "" {
+		t.Fatalf("invalid cookie not cleared: %d %q", status, headers.Get("Set-Cookie"))
+	}
+	if status, _, _ := request("POST", "/api/v1/auth/login", map[string]string{"login": "contractuser", "password": "exact password"}); status != 200 {
+		t.Fatalf("case-insensitive login=%d", status)
+	}
+	if status, body, _ := request("POST", "/api/v1/auth/login", map[string]string{"login": "ContractUser", "password": "wrong password"}); status != 401 || errorCode(body) != "invalid_credentials" {
+		t.Fatalf("bad password=%d %#v", status, body)
+	}
+	if status, body, _ := request("POST", "/api/v1/auth/login", map[string]string{"login": "UnknownUser", "password": "wrong password"}); status != 401 || errorCode(body) != "invalid_credentials" {
+		t.Fatalf("unknown=%d %#v", status, body)
+	}
+	badOrigin, _ := http.NewRequest(http.MethodPost, server.URL+"/api/v1/auth/logout", nil)
+	badOrigin.Header.Set("Origin", "https://evil.test")
+	response, err := client.Do(badOrigin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != 403 {
+		t.Fatalf("csrf=%d", response.StatusCode)
+	}
+	assertAuthHeaders(t, response.Header)
+	for attempt := 1; attempt <= 6; attempt++ {
+		status, body, headers := request("POST", "/api/v1/auth/login", map[string]string{"login": "LimitedUser", "password": "wrong password"})
+		if attempt < 6 && (status != 401 || errorCode(body) != "invalid_credentials") {
+			t.Fatalf("attempt %d=%d %#v", attempt, status, body)
+		}
+		if attempt == 6 && (status != 429 || errorCode(body) != "login_rate_limited" || headers.Get("Retry-After") == "") {
+			t.Fatalf("limited=%d %#v retry=%q", status, body, headers.Get("Retry-After"))
+		}
+	}
+	logText := logs.String()
+	for _, secret := range []string{"exact password", "wrong password", passwordHash, rawToken, "\"password\"", "flashka_session="} {
+		if secret != "" && strings.Contains(logText, secret) {
+			t.Fatalf("secret leaked in logs: %q", secret)
+		}
+	}
+	assertAccessLogs(t, logText)
+}
+
+func errorCode(body map[string]any) string {
+	envelope, _ := body["error"].(map[string]any)
+	code, _ := envelope["code"].(string)
+	return code
+}
+
+func assertAuthHeaders(t *testing.T, headers http.Header) {
+	t.Helper()
+	assertSecurityHeaders(t, headers)
+	if headers.Get("Cache-Control") != "no-store" {
+		t.Fatal("auth response may be cached")
+	}
+}
+
+func assertSecurityHeaders(t *testing.T, headers http.Header) {
+	t.Helper()
+	for _, name := range []string{"X-Request-ID", "X-Content-Type-Options", "Referrer-Policy", "Content-Security-Policy", "Permissions-Policy"} {
+		if headers.Get(name) == "" {
+			t.Fatalf("missing %s", name)
+		}
+	}
+}
+
+func mustURL(t *testing.T, value string) *url.URL {
+	t.Helper()
+	parsed, err := url.Parse(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return parsed
+}
+
+func assertAccessLogs(t *testing.T, text string) {
+	t.Helper()
+	foundSuccess, foundError := false, false
+	for _, line := range strings.Split(strings.TrimSpace(text), "\n") {
+		entry := map[string]any{}
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatal(err)
+		}
+		if entry["msg"] != "http request" {
+			continue
+		}
+		for _, field := range []string{"requestId", "method", "route", "status", "durationMs"} {
+			if _, ok := entry[field]; !ok {
+				t.Fatalf("log lacks %s: %s", field, line)
+			}
+		}
+		status, _ := entry["status"].(float64)
+		if status == 201 {
+			if entry["userId"] == nil {
+				t.Fatalf("successful auth log lacks userId: %s", line)
+			}
+			foundSuccess = true
+		}
+		if status == 401 {
+			foundError = true
+		}
+	}
+	if !foundSuccess || !foundError {
+		t.Fatalf("missing success/error access logs: %s", text)
+	}
+}

@@ -3,6 +3,13 @@
 Статус: целевая архитектура MVP.  
 Связанная спецификация: [PRODUCT.md](PRODUCT.md).
 
+Процесс изменения архитектуры описан в [DEVELOPMENT.md](DEVELOPMENT.md).
+Обоснования исходных решений зафиксированы в ADR:
+
+- [ADR-0001: Модульный монолит](adr/0001-modular-monolith.md);
+- [ADR-0002: Сессии аутентификации в PostgreSQL](adr/0002-postgresql-auth-sessions.md);
+- [ADR-0003: Бинарный планировщик повторений MVP](adr/0003-mvp-review-scheduler.md).
+
 ## 1. Архитектурные решения
 
 Flashka реализуется как модульный монолит:
