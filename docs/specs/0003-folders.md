@@ -1,7 +1,5 @@
 # SPEC-0003: Папки
 
-Status: Implemented
-
 Date: 2026-10-15
 
 ## Цель

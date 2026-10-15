@@ -1,6 +1,5 @@
 # SPEC-0001: Регистрация и вход
 
-Status: Implemented  
 Date: 2026-10-14
 
 ## Цель
