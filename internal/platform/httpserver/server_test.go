@@ -69,6 +69,15 @@ func TestSecurityAndHealthHeaders(t *testing.T) {
 	}
 }
 
+func TestCardsRequireAuthentication(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/cards", nil)
+	rec := httptest.NewRecorder()
+	testHandler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized || !strings.Contains(rec.Body.String(), `"code":"unauthenticated"`) {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestProductionEnablesHSTS(t *testing.T) {
 	cfg := config.Config{Environment: "production", CookieName: "session", SessionTTL: time.Hour, TrustedOrigin: "https://flashka.test"}
 	service := auth.Service{Clock: fixedClock{time.Unix(1_000, 0)}, TTL: time.Hour}

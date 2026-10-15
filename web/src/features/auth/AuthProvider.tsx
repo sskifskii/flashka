@@ -69,6 +69,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       c?.close();
     };
   }, [client, refetch]);
+  useEffect(() => {
+    const unauthenticated = () => client.setQueryData(["auth", "me"], null);
+    window.addEventListener("flashka:unauthenticated", unauthenticated);
+    return () =>
+      window.removeEventListener("flashka:unauthenticated", unauthenticated);
+  }, [client]);
   return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>;
 }
 export function useAuth() {

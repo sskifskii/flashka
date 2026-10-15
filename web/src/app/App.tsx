@@ -1,7 +1,15 @@
 import { useState } from "react";
-import { Navigate, Outlet, Route, Routes, useNavigate } from "react-router-dom";
+import {
+  Link,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useNavigate,
+} from "react-router-dom";
 import { useAuth } from "../features/auth/AuthProvider";
 import { AuthForm } from "../features/auth/AuthForm";
+import { CardDetail, CardList, NewCard } from "../features/cards/Cards";
 function Loading() {
   return (
     <main className="loading" aria-live="polite">
@@ -55,9 +63,9 @@ function Shell() {
   return (
     <main className="shell">
       <header>
-        <a className="brand" href="/app">
+        <Link className="brand" to="/app">
           Flashka
-        </a>
+        </Link>
         <div>
           <span className="user-login">{user?.login}</span>
           <button
@@ -88,13 +96,7 @@ function Shell() {
           {logoutError}
         </p>
       )}
-      <section className="empty">
-        <span className="spark">✦</span>
-        <h1>Добро пожаловать, {user?.login}</h1>
-        <p>
-          Ваше пространство готово. Карточки появятся в следующем обновлении.
-        </p>
-      </section>
+      <Outlet />
     </main>
   );
 }
@@ -106,7 +108,11 @@ export function App() {
         <Route path="/register" element={<AuthForm mode="register" />} />
       </Route>
       <Route element={<Protected />}>
-        <Route path="/app" element={<Shell />} />
+        <Route path="/app" element={<Shell />}>
+          <Route index element={<CardList />} />
+          <Route path="cards/new" element={<NewCard />} />
+          <Route path="cards/:id" element={<CardDetail />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/app" replace />} />
     </Routes>

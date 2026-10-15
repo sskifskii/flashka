@@ -58,6 +58,75 @@ paths:
         "200": { $ref: "#/components/responses/CurrentUser" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/cards:
+    get:
+      summary: List the current user's Inbox cards
+      operationId: listCards
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: folderId, in: query, description: Reserved for SPEC-0003 and currently rejected., schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Stable page ordered by creation time and UUID descending.
+          content: { application/json: { schema: { $ref: "#/components/schemas/CardList" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+    post:
+      summary: Create a card in the current user's Inbox
+      operationId: createCard
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/CardCreate" } } }
+      responses:
+        "201":
+          description: Card created.
+          content: { application/json: { schema: { $ref: "#/components/schemas/CardEnvelope" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/cards/{cardId}:
+    parameters:
+      - { name: cardId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read one owned card
+      operationId: getCard
+      responses:
+        "200":
+          description: Card found.
+          content: { application/json: { schema: { $ref: "#/components/schemas/CardEnvelope" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+    patch:
+      summary: Update one or both text sides of an owned card
+      operationId: updateCard
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/CardPatch" } } }
+      responses:
+        "200":
+          description: Card updated without changing its scheduling aggregates.
+          content: { application/json: { schema: { $ref: "#/components/schemas/CardEnvelope" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+    delete:
+      summary: Permanently delete an owned card
+      operationId: deleteCard
+      responses:
+        "204": { description: Card deleted; response has no body. }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
   /health/live:
     get:
       summary: Check whether the HTTP process is alive
@@ -142,6 +211,65 @@ components:
       required: [status]
       properties:
         status: { type: string, const: ok }
+    CardSide:
+      type: string
+      minLength: 1
+      maxLength: 2000
+      description: Plain text trimmed only at its Unicode White_Space edges.
+    CardCreate:
+      type: object
+      additionalProperties: false
+      required: [front, back]
+      properties:
+        front: { $ref: "#/components/schemas/CardSide" }
+        back: { $ref: "#/components/schemas/CardSide" }
+    CardPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        front: { $ref: "#/components/schemas/CardSide" }
+        back: { $ref: "#/components/schemas/CardSide" }
+    CardSummary:
+      type: object
+      additionalProperties: false
+      required: [id, front, back, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        front: { $ref: "#/components/schemas/CardSide" }
+        back: { $ref: "#/components/schemas/CardSide" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Card:
+      type: object
+      additionalProperties: false
+      required: [id, folderId, front, back, correctCount, incorrectCount, correctStreak, intervalDays, lastReviewedAt, dueAt, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        folderId: { type: string, format: uuid }
+        front: { $ref: "#/components/schemas/CardSide" }
+        back: { $ref: "#/components/schemas/CardSide" }
+        correctCount: { type: integer, minimum: 0 }
+        incorrectCount: { type: integer, minimum: 0 }
+        correctStreak: { type: integer, minimum: 0 }
+        intervalDays: { type: [integer, "null"], minimum: 1 }
+        lastReviewedAt: { type: [string, "null"], format: date-time }
+        dueAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CardEnvelope:
+      type: object
+      additionalProperties: false
+      required: [card]
+      properties:
+        card: { $ref: "#/components/schemas/Card" }
+    CardList:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/CardSummary" } }
+        nextCursor: { type: [string, "null"] }
   responses:
     RegisterCreated:
       description: User, Inbox and session were created atomically.

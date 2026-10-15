@@ -12,14 +12,39 @@ test("register reload cross-tab logout and login", async ({
   await page.getByRole("button", { name: "Создать аккаунт" }).click();
   await expect(page).toHaveURL(/\/app$/);
   await page.reload();
-  await expect(page.getByText(`Добро пожаловать, ${login}`)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Карточки" })).toBeVisible();
+  await page.getByRole("link", { name: "Добавить карточку" }).first().click();
+  await page.getByLabel("Лицевая сторона").fill("  <script>front</script>  ");
+  await page.getByLabel("Обратная сторона").fill("back\nline");
+  await page.getByRole("button", { name: "Сохранить" }).click();
+  await expect(page.getByText("Карточка сохранена")).toBeVisible();
+  await page.getByRole("link", { name: "Открыть карточку" }).click();
+  await expect(
+    page.getByText("<script>front</script>", { exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("back\nline", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Редактировать" }).click();
+  await page.getByLabel("Лицевая сторона").fill("changed front");
+  await page.getByRole("button", { name: "Сохранить" }).click();
+  await expect(page.getByText("changed front", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Удалить" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Отмена" }).click();
+  await expect(page.getByText("changed front", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Удалить" }).click();
+  await page.getByRole("button", { name: "Удалить навсегда" }).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByText("Создайте первую карточку")).toBeVisible();
   await expect(page.locator("body")).toHaveJSProperty(
     "scrollWidth",
     await page.locator("body").evaluate((el) => el.clientWidth),
   );
   const otherPage = await context.newPage();
   await otherPage.goto("/app");
-  await expect(otherPage.getByText(`Добро пожаловать, ${login}`)).toBeVisible();
+  await expect(
+    otherPage.getByRole("heading", { name: "Карточки" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Выйти" }).click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(otherPage).toHaveURL(/\/login$/);
@@ -46,7 +71,9 @@ test("focus fallback notices a logout when BroadcastChannel is unavailable", asy
 
   const otherPage = await context.newPage();
   await otherPage.goto("/app");
-  await expect(otherPage.getByText(`Добро пожаловать, ${login}`)).toBeVisible();
+  await expect(
+    otherPage.getByRole("heading", { name: "Карточки" }),
+  ).toBeVisible();
   await page.bringToFront();
   await page.getByRole("button", { name: "Выйти" }).click();
   await otherPage.bringToFront();

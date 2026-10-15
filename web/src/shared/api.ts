@@ -1,4 +1,20 @@
 export type User = { id: string; login: string };
+export type CardSummary = {
+  id: string;
+  front: string;
+  back: string;
+  createdAt: string;
+  updatedAt: string;
+};
+export type Card = CardSummary & {
+  folderId: string;
+  correctCount: number;
+  incorrectCount: number;
+  correctStreak: number;
+  intervalDays: number | null;
+  lastReviewedAt: string | null;
+  dueAt: string | null;
+};
 export type APIError = {
   error: {
     code: string;
@@ -43,7 +59,11 @@ async function request<T>(
   } catch {
     body = undefined;
   }
-  if (!response.ok) throw new RequestError(response.status, body as APIError);
+  if (!response.ok) {
+    if (response.status === 401 && path !== "/auth/me")
+      window.dispatchEvent(new Event("flashka:unauthenticated"));
+    throw new RequestError(response.status, body as APIError);
+  }
   if (response.status !== expectedStatus)
     throw new RequestError(response.status);
   return body as T;
@@ -65,4 +85,22 @@ export const api = {
       body: JSON.stringify(value),
     }),
   logout: () => request<void>("/auth/logout", { method: "POST" }, 204),
+  listCards: (cursor?: string) =>
+    request<{ items: CardSummary[]; nextCursor: string | null }>(
+      `/cards${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+    ),
+  createCard: (value: { front: string; back: string }) =>
+    request<{ card: Card }>(
+      "/cards",
+      { method: "POST", body: JSON.stringify(value) },
+      201,
+    ),
+  getCard: (id: string) => request<{ card: Card }>(`/cards/${id}`),
+  updateCard: (id: string, value: { front: string; back: string }) =>
+    request<{ card: Card }>(`/cards/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(value),
+    }),
+  deleteCard: (id: string) =>
+    request<void>(`/cards/${id}`, { method: "DELETE" }, 204),
 };

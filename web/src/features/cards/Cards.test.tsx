@@ -1,0 +1,236 @@
+import { act, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { CardDetail, CardList, NewCard } from "./Cards";
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("cards UI", () => {
+  const summary = (id: string, front: string) => ({
+    id,
+    front,
+    back: `${front} back`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  const listResponse = (
+    items: ReturnType<typeof summary>[],
+    nextCursor: string | null,
+  ) =>
+    new Response(JSON.stringify({ items, nextCursor }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  const cardResponse = () =>
+    new Response(
+      JSON.stringify({
+        card: {
+          ...summary("00000000-0000-4000-8000-000000000001", "front"),
+          folderId: "00000000-0000-4000-8000-000000000002",
+          correctCount: 0,
+          incorrectCount: 0,
+          correctStreak: 0,
+          intervalDays: null,
+          lastReviewedAt: null,
+          dueAt: null,
+        },
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+
+  it("moves from the list skeleton to the empty state", async () => {
+    let finish!: (response: Response) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            finish = resolve;
+          }),
+      ),
+    );
+    render(
+      <MemoryRouter>
+        <CardList />
+      </MemoryRouter>,
+    );
+    expect(screen.getByLabelText("Загрузка карточек")).toBeVisible();
+    await act(async () => finish(listResponse([], null)));
+    expect(await screen.findByText("Создайте первую карточку")).toBeVisible();
+    expect(
+      screen.queryByLabelText("Загрузка карточек"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("retries an initial list error and shows the successful result", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("offline"))
+      .mockResolvedValueOnce(
+        listResponse(
+          [summary("00000000-0000-4000-8000-000000000001", "first")],
+          null,
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <MemoryRouter>
+        <CardList />
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByText("Не удалось загрузить карточки."),
+    ).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Повторить" }));
+    expect(await screen.findByText("first")).toBeVisible();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps page one when page two fails and retries the same cursor", async () => {
+    const first = summary("00000000-0000-4000-8000-000000000001", "first");
+    const second = summary("00000000-0000-4000-8000-000000000002", "second");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(listResponse([first], "page-two"))
+      .mockRejectedValueOnce(new TypeError("offline"))
+      .mockResolvedValueOnce(listResponse([second], null));
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <MemoryRouter>
+        <CardList />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("first")).toBeVisible();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Загрузить ещё" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Не удалось загрузить карточки.",
+    );
+    expect(screen.getByText("first")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Повторить" }));
+    expect(await screen.findByText("second")).toBeVisible();
+    expect(screen.getByText("first")).toBeVisible();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "/api/v1/cards?cursor=page-two",
+      expect.anything(),
+    );
+  });
+
+  it("shows a tenant-safe detail not-found state", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "card_not_found",
+              message: "Карточка не найдена",
+              requestId: crypto.randomUUID(),
+            },
+          }),
+          { status: 404, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+    render(
+      <MemoryRouter initialEntries={["/app/cards/missing"]}>
+        <Routes>
+          <Route path="/app/cards/:id" element={<CardDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Карточка не найдена" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "Вернуться к списку" }),
+    ).toBeVisible();
+  });
+
+  it("retries an initial detail network error", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("offline"))
+      .mockResolvedValueOnce(cardResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <MemoryRouter
+        initialEntries={["/app/cards/00000000-0000-4000-8000-000000000001"]}
+      >
+        <Routes>
+          <Route path="/app/cards/:id" element={<CardDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Не удалось загрузить карточку.",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Повторить" }));
+    expect(await screen.findByText("front", { exact: true })).toBeVisible();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("validates both sides and preserves input after a network error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
+    render(
+      <MemoryRouter>
+        <NewCard />
+      </MemoryRouter>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+    expect(screen.getAllByText("Поле обязательно")).toHaveLength(2);
+    await userEvent.type(screen.getByLabelText("Лицевая сторона"), "front");
+    await userEvent.type(screen.getByLabelText("Обратная сторона"), "back");
+    await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Не удалось сохранить",
+    );
+    expect(screen.getByLabelText("Лицевая сторона")).toHaveValue("front");
+    expect(screen.getByLabelText("Обратная сторона")).toHaveValue("back");
+  });
+
+  it("renders text safely and requires explicit delete confirmation", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          card: {
+            id: "00000000-0000-4000-8000-000000000001",
+            folderId: "00000000-0000-4000-8000-000000000002",
+            front: "<script>alert(1)</script>",
+            back: "plain",
+            correctCount: 0,
+            incorrectCount: 0,
+            correctStreak: 0,
+            intervalDays: null,
+            lastReviewedAt: null,
+            dueAt: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <MemoryRouter
+        initialEntries={["/app/cards/00000000-0000-4000-8000-000000000001"]}
+      >
+        <Routes>
+          <Route path="/app/cards/:id" element={<CardDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("<script>alert(1)</script>")).toBeVisible();
+    expect(document.querySelector("script")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Удалить" }));
+    expect(screen.getByRole("dialog")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Отмена" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+});

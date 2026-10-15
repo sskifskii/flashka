@@ -64,7 +64,9 @@ describe("authentication routes", () => {
     );
     renderApp("/app");
     expect(screen.getByText("Проверяем сессию…")).toBeVisible();
-    expect(screen.queryByText(/Добро пожаловать/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Карточки" }),
+    ).not.toBeInTheDocument();
   });
 
   it("redirects an explicit guest to login", async () => {
@@ -89,7 +91,9 @@ describe("authentication routes", () => {
       expect(
         screen.queryByRole("heading", { name: "С возвращением" }),
       ).not.toBeInTheDocument();
-      expect(screen.queryByText(/Добро пожаловать/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "Карточки" }),
+      ).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Повторить" })).toBeEnabled();
     },
   );
@@ -118,6 +122,13 @@ describe("authentication routes", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input).endsWith("/auth/me"))
         return Promise.resolve(userResponse());
+      if (String(input).endsWith("/cards") && !init?.method)
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: [], nextCursor: null }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
       if (String(input).endsWith("/auth/logout") && init?.method === "POST")
         return logoutResponse;
       throw new Error(`unexpected request ${String(input)}`);
@@ -131,22 +142,24 @@ describe("authentication routes", () => {
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("BroadcastChannel", TestChannel);
     renderApp("/app");
-    expect(await screen.findByText("Добро пожаловать, Alex")).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Карточки" }),
+    ).toBeVisible();
     const button = screen.getByRole("button", { name: "Выйти" });
     const click = userEvent.click(button);
     expect(
       await screen.findByRole("button", { name: "Выходим…" }),
     ).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: "Выходим…" }));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(screen.getByText("Добро пожаловать, Alex")).toBeVisible();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(screen.getByRole("heading", { name: "Карточки" })).toBeVisible();
     expect(postMessage).not.toHaveBeenCalled();
     finishLogout(errorResponse(500));
     await click;
     expect(await screen.findByText(/Не удалось выйти/)).toBeVisible();
-    expect(screen.getByText("Добро пожаловать, Alex")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Карточки" })).toBeVisible();
     expect(postMessage).not.toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("broadcasts and navigates only after logout returns 204", async () => {
@@ -157,6 +170,13 @@ describe("authentication routes", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input).endsWith("/auth/me"))
         return Promise.resolve(userResponse());
+      if (String(input).endsWith("/cards") && !init?.method)
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: [], nextCursor: null }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
       if (String(input).endsWith("/auth/logout") && init?.method === "POST")
         return logoutResponse;
       throw new Error(`unexpected request ${String(input)}`);
@@ -170,14 +190,16 @@ describe("authentication routes", () => {
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("BroadcastChannel", TestChannel);
     renderApp("/app");
-    expect(await screen.findByText("Добро пожаловать, Alex")).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Карточки" }),
+    ).toBeVisible();
     const click = userEvent.click(
       screen.getByRole("button", { name: "Выйти" }),
     );
     expect(
       await screen.findByRole("button", { name: "Выходим…" }),
     ).toBeDisabled();
-    expect(screen.getByText("Добро пожаловать, Alex")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Карточки" })).toBeVisible();
     expect(postMessage).not.toHaveBeenCalled();
     finishLogout(new Response(null, { status: 204 }));
     await click;

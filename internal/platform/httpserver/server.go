@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/skif/flashka/internal/auth"
+	"github.com/skif/flashka/internal/cards"
 	"github.com/skif/flashka/internal/platform/config"
 )
 
@@ -36,12 +38,13 @@ type Server struct {
 	cfg     config.Config
 	pool    *pgxpool.Pool
 	auth    auth.Service
+	cards   cards.Service
 	limiter *auth.LoginLimiter
 	log     *slog.Logger
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, service auth.Service, log *slog.Logger) http.Handler {
-	s := &Server{cfg: cfg, pool: pool, auth: service, limiter: auth.NewLoginLimiter(service.Clock), log: log}
+	s := &Server{cfg: cfg, pool: pool, auth: service, cards: cards.Service{Repo: cards.Repository{Pool: pool}, Clock: service.Clock}, limiter: auth.NewLoginLimiter(service.Clock), log: log}
 	r := chi.NewRouter()
 	r.Use(s.requestContext, s.accessLog, s.recoverer, s.security)
 	r.Get("/health/live", s.live)
@@ -54,9 +57,189 @@ func New(cfg config.Config, pool *pgxpool.Pool, service auth.Service, log *slog.
 			r.With(s.csrf).Post("/logout", s.logout)
 			r.Get("/me", s.me)
 		})
+		r.Route("/cards", func(r chi.Router) {
+			r.Use(s.authenticated)
+			r.Get("/", s.listCards)
+			r.With(s.csrf).Post("/", s.createCard)
+			r.Route("/{cardId}", func(r chi.Router) {
+				r.Get("/", s.getCard)
+				r.With(s.csrf).Patch("/", s.updateCard)
+				r.With(s.csrf).Delete("/", s.deleteCard)
+			})
+		})
 	})
 	r.Handle("/*", s.frontend())
 	return r
+}
+
+func (s *Server) authenticated(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie(s.cfg.CookieName)
+		if err != nil {
+			writeError(w, r, 401, "unauthenticated", "Требуется вход", nil)
+			return
+		}
+		user, err := s.auth.CurrentUser(r.Context(), cookie.Value)
+		if errors.Is(err, auth.ErrNotFound) {
+			s.clearCookie(w)
+			writeError(w, r, 401, "unauthenticated", "Требуется вход", nil)
+			return
+		}
+		if err != nil {
+			s.internal(w, r, err)
+			return
+		}
+		setUserID(r, user.ID.String())
+		next.ServeHTTP(w, r)
+	})
+}
+
+func currentUserID(r *http.Request) uuid.UUID {
+	meta, _ := r.Context().Value(requestIDKey).(*requestMeta)
+	if meta == nil {
+		return uuid.Nil
+	}
+	id, _ := uuid.Parse(meta.userID)
+	return id
+}
+
+type createCardInput struct {
+	Front string `json:"front"`
+	Back  string `json:"back"`
+}
+type updateCardInput struct {
+	Front *string `json:"front"`
+	Back  *string `json:"back"`
+}
+
+func decodeJSON(w http.ResponseWriter, r *http.Request, out any) bool {
+	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
+		writeError(w, r, 400, "invalid_request", "Ожидается JSON", nil)
+		return false
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	d := json.NewDecoder(r.Body)
+	d.DisallowUnknownFields()
+	if err := d.Decode(out); err != nil {
+		writeError(w, r, 400, "invalid_request", "Некорректный JSON", nil)
+		return false
+	}
+	if err := d.Decode(&struct{}{}); err != io.EOF {
+		writeError(w, r, 400, "invalid_request", "Некорректный JSON", nil)
+		return false
+	}
+	return true
+}
+
+func cardID(r *http.Request) (uuid.UUID, bool) {
+	id, err := uuid.Parse(chi.URLParam(r, "cardId"))
+	return id, err == nil
+}
+
+func (s *Server) listCards(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	if q.Has("folderId") {
+		writeError(w, r, 422, "validation_failed", "Выбор папки пока недоступен", map[string]string{"folderId": "Пока доступен только Inbox"})
+		return
+	}
+	limit := 50
+	if raw := q.Get("limit"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 || n > 100 {
+			writeError(w, r, 422, "validation_failed", "Проверьте параметры", map[string]string{"limit": "От 1 до 100"})
+			return
+		}
+		limit = n
+	}
+	items, next, err := s.cards.List(r.Context(), currentUserID(r), q.Get("cursor"), limit)
+	if errors.Is(err, cards.ErrInvalidCursor) {
+		writeError(w, r, 400, "invalid_cursor", "Некорректный курсор", nil)
+		return
+	}
+	if err != nil {
+		s.internal(w, r, err)
+		return
+	}
+	var nextCursor *string
+	if next != "" {
+		nextCursor = &next
+	}
+	writeJSON(w, 200, map[string]any{"items": items, "nextCursor": nextCursor})
+}
+func (s *Server) createCard(w http.ResponseWriter, r *http.Request) {
+	var in createCardInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	card, fields, err := s.cards.Create(r.Context(), currentUserID(r), in.Front, in.Back)
+	if fields != nil {
+		writeError(w, r, 422, "validation_failed", "Проверьте введённые данные", fields)
+		return
+	}
+	if err != nil {
+		s.internal(w, r, err)
+		return
+	}
+	writeJSON(w, 201, map[string]any{"card": card})
+}
+func (s *Server) getCard(w http.ResponseWriter, r *http.Request) {
+	id, ok := cardID(r)
+	if !ok {
+		writeError(w, r, 404, "card_not_found", "Карточка не найдена", nil)
+		return
+	}
+	card, err := s.cards.Get(r.Context(), currentUserID(r), id)
+	if errors.Is(err, cards.ErrNotFound) {
+		writeError(w, r, 404, "card_not_found", "Карточка не найдена", nil)
+		return
+	}
+	if err != nil {
+		s.internal(w, r, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"card": card})
+}
+func (s *Server) updateCard(w http.ResponseWriter, r *http.Request) {
+	id, ok := cardID(r)
+	if !ok {
+		writeError(w, r, 404, "card_not_found", "Карточка не найдена", nil)
+		return
+	}
+	var in updateCardInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	card, fields, err := s.cards.Update(r.Context(), currentUserID(r), id, in.Front, in.Back)
+	if fields != nil {
+		writeError(w, r, 422, "validation_failed", "Проверьте введённые данные", fields)
+		return
+	}
+	if errors.Is(err, cards.ErrNotFound) {
+		writeError(w, r, 404, "card_not_found", "Карточка не найдена", nil)
+		return
+	}
+	if err != nil {
+		s.internal(w, r, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"card": card})
+}
+func (s *Server) deleteCard(w http.ResponseWriter, r *http.Request) {
+	id, ok := cardID(r)
+	if !ok {
+		writeError(w, r, 404, "card_not_found", "Карточка не найдена", nil)
+		return
+	}
+	err := s.cards.Delete(r.Context(), currentUserID(r), id)
+	if errors.Is(err, cards.ErrNotFound) {
+		writeError(w, r, 404, "card_not_found", "Карточка не найдена", nil)
+		return
+	}
+	if err != nil {
+		s.internal(w, r, err)
+		return
+	}
+	w.WriteHeader(204)
 }
 
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
@@ -328,9 +511,9 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
 }
-func writeError(w http.ResponseWriter, r *http.Request, status int, code, message string, fields auth.FieldErrors) {
+func writeError(w http.ResponseWriter, r *http.Request, status int, code, message string, fields any) {
 	e := map[string]any{"code": code, "message": message, "requestId": requestID(r)}
-	if len(fields) > 0 {
+	if fields != nil {
 		e["fields"] = fields
 	}
 	writeJSON(w, status, map[string]any{"error": e})

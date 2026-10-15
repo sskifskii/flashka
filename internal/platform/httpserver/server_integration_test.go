@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/skif/flashka/internal/auth"
 	"github.com/skif/flashka/internal/platform/config"
@@ -124,6 +125,63 @@ func TestAuthHTTPContract(t *testing.T) {
 	if status, body, _ := request("POST", "/api/v1/auth/login", map[string]string{"login": "UnknownUser", "password": "wrong password"}); status != 401 || errorCode(body) != "invalid_credentials" {
 		t.Fatalf("unknown=%d %#v", status, body)
 	}
+	if status, body, _ := request("POST", "/api/v1/cards", map[string]string{"front": "  private front  ", "back": "private\nback"}); status != 201 {
+		t.Fatalf("create card=%d %#v", status, body)
+	}
+	status, body, _ := request("GET", "/api/v1/cards?limit=1", nil)
+	if status != 200 {
+		t.Fatalf("list cards=%d %#v", status, body)
+	}
+	items, _ := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items=%#v", body)
+	}
+	item, _ := items[0].(map[string]any)
+	cardID, _ := item["id"].(string)
+	if item["front"] != "private front" || cardID == "" {
+		t.Fatalf("card=%#v", item)
+	}
+	if status, body, _ = request("PATCH", "/api/v1/cards/"+cardID, map[string]string{"front": "changed front"}); status != 200 {
+		t.Fatalf("patch=%d %#v", status, body)
+	}
+	if status, body, _ = request("POST", "/api/v1/cards", map[string]string{"front": "", "back": "ok"}); status != 422 || errorCode(body) != "validation_failed" {
+		t.Fatalf("validation=%d %#v", status, body)
+	}
+	if status, body, _ = request("POST", "/api/v1/cards", map[string]string{"front": "a", "back": "b", "extra": "no"}); status != 400 || errorCode(body) != "invalid_request" {
+		t.Fatalf("strict=%d %#v", status, body)
+	}
+	if status, body, _ = request("GET", "/api/v1/cards?folderId="+uuid.NewString(), nil); status != 422 {
+		t.Fatalf("folder=%d %#v", status, body)
+	}
+	if status, body, _ = request("GET", "/api/v1/cards?cursor=broken", nil); status != 400 || errorCode(body) != "invalid_cursor" {
+		t.Fatalf("cursor=%d %#v", status, body)
+	}
+	now := time.Now().UTC()
+	otherUser, otherFolder, otherCard := uuid.New(), uuid.New(), uuid.New()
+	if _, err = pool.Exec(context.Background(), `INSERT INTO users(id,login,login_normalized,password_hash,created_at,updated_at) VALUES($1,'OtherUser','otheruser','hash',$2,$2)`, otherUser, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = pool.Exec(context.Background(), `INSERT INTO folders(id,user_id,name,name_normalized,is_inbox,created_at,updated_at) VALUES($1,$2,'Inbox','inbox',true,$3,$3)`, otherFolder, otherUser, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = pool.Exec(context.Background(), `INSERT INTO cards(id,user_id,folder_id,front,back,created_at,updated_at) VALUES($1,$2,$3,'other front','other back',$4,$4)`, otherCard, otherUser, otherFolder, now); err != nil {
+		t.Fatal(err)
+	}
+	for _, method := range []string{"GET", "PATCH", "DELETE"} {
+		var payload any
+		if method == "PATCH" {
+			payload = map[string]string{"front": "stolen"}
+		}
+		if status, body, _ = request(method, "/api/v1/cards/"+otherCard.String(), payload); status != 404 || errorCode(body) != "card_not_found" {
+			t.Fatalf("tenant %s=%d %#v", method, status, body)
+		}
+	}
+	if status, _, _ = request("DELETE", "/api/v1/cards/"+cardID, nil); status != 204 {
+		t.Fatalf("delete=%d", status)
+	}
+	if status, body, _ = request("GET", "/api/v1/cards/"+cardID, nil); status != 404 || errorCode(body) != "card_not_found" {
+		t.Fatalf("deleted=%d %#v", status, body)
+	}
 	badOrigin, _ := http.NewRequest(http.MethodPost, server.URL+"/api/v1/auth/logout", nil)
 	badOrigin.Header.Set("Origin", "https://evil.test")
 	response, err := client.Do(badOrigin)
@@ -145,7 +203,7 @@ func TestAuthHTTPContract(t *testing.T) {
 		}
 	}
 	logText := logs.String()
-	for _, secret := range []string{"exact password", "wrong password", passwordHash, rawToken, "\"password\"", "flashka_session="} {
+	for _, secret := range []string{"exact password", "wrong password", passwordHash, rawToken, "\"password\"", "flashka_session=", "private front", "private\\nback", "changed front", "other front", "other back"} {
 		if secret != "" && strings.Contains(logText, secret) {
 			t.Fatalf("secret leaked in logs: %q", secret)
 		}

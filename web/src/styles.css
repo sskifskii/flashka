@@ -17,7 +17,8 @@ body {
   min-width: 320px;
 }
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 .brand {
@@ -68,7 +69,8 @@ label {
   font-weight: 650;
   margin-top: 10px;
 }
-input {
+input,
+textarea {
   width: 100%;
   min-height: 48px;
   padding: 11px 13px;
@@ -76,13 +78,20 @@ input {
   border-radius: 10px;
   background: white;
 }
+textarea {
+  min-height: 132px;
+  resize: vertical;
+  line-height: 1.5;
+}
 input:focus,
+textarea:focus,
 button:focus-visible,
 a:focus-visible {
   outline: 3px solid #9fb2ff;
   outline-offset: 2px;
 }
-input[aria-invalid="true"] {
+input[aria-invalid="true"],
+textarea[aria-invalid="true"] {
   border-color: #b52c42;
 }
 .field-error,
@@ -171,6 +180,143 @@ button:disabled {
   text-align: center;
   max-width: 620px;
 }
+.content {
+  width: min(100% - 32px, 1120px);
+  margin: 0 auto;
+  padding: 42px 0 72px;
+}
+.content.narrow {
+  max-width: 720px;
+}
+.content > a:not(.button-link) {
+  color: #3157d5;
+}
+.title-row,
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.title-row h1,
+.content > h1 {
+  margin-top: 8px;
+}
+.eyebrow {
+  margin: 0;
+  color: #66708a;
+  font-weight: 700;
+}
+.button-link {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  padding: 11px 18px;
+  background: #3157d5;
+  color: white;
+  font-weight: 700;
+  text-decoration: none;
+}
+.secondary-link {
+  color: #264bc3;
+  background: transparent;
+  border: 1px solid #bac5df;
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 16px;
+  margin-top: 28px;
+}
+.card-item,
+.detail {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  background: white;
+  color: #17213c;
+  text-decoration: none;
+  border: 1px solid #dfe4f0;
+  border-radius: 16px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.card-item span {
+  color: #66708a;
+}
+.card-skeleton {
+  height: 160px;
+  margin-top: 28px;
+  border-radius: 16px;
+  background: linear-gradient(100deg, #e9edf5 20%, #f8f9fc 40%, #e9edf5 60%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer {
+  to {
+    background-position-x: -200%;
+  }
+}
+.state {
+  max-width: 640px;
+  margin: 56px auto;
+  text-align: center;
+}
+.state p {
+  color: #66708a;
+}
+.error-state {
+  background: #fff0f2;
+  padding: 24px;
+  border-radius: 14px;
+}
+.load-more {
+  display: block;
+  margin: 24px auto 0;
+}
+.detail {
+  margin: 24px 0;
+}
+.detail h2 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: #66708a;
+  margin: 0;
+}
+.detail p {
+  margin: 0;
+  line-height: 1.55;
+}
+.actions {
+  justify-content: flex-start;
+}
+.actions button {
+  margin-top: 14px;
+}
+.danger {
+  background: #b52c42;
+}
+.confirm {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 27, 48, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 10;
+}
+.confirm > div {
+  width: min(100%, 440px);
+  background: white;
+  padding: 28px;
+  border-radius: 18px;
+}
+.confirm h2 {
+  margin-top: 0;
+}
 .shell-error {
   max-width: 1120px;
   margin: 16px auto 0;
@@ -215,6 +361,16 @@ button:disabled {
   .shell header > div {
     min-width: 0;
     gap: 8px;
+  }
+  .content {
+    width: min(100% - 24px, 1120px);
+    padding-top: 28px;
+  }
+  .title-row {
+    align-items: flex-end;
+  }
+  .title-row .button-link {
+    width: 100%;
   }
   .user-login {
     width: 80px;
