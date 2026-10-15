@@ -481,6 +481,96 @@ button:disabled {
 .card-item span {
   color: #66708a;
 }
+.status-badge {
+  justify-self: start;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #eef1f7;
+  color: #4e5972;
+  font-size: 0.78rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.status-due {
+  background: #fff0f2;
+  color: #a21d34;
+}
+.status-mastered {
+  background: #eaf8ee;
+  color: #26713d;
+}
+.status-learning {
+  background: #fff7dc;
+  color: #66521c;
+}
+.card-progress,
+.result-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 24px;
+}
+.card-progress div,
+.result-summary div {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #dfe4f0;
+  border-radius: 14px;
+  background: #fff;
+}
+.card-progress dt,
+.result-summary span {
+  color: #66708a;
+  font-size: 0.85rem;
+}
+.card-progress dd {
+  margin: 5px 0 0;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+.result-summary strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: clamp(1.5rem, 6vw, 2.15rem);
+}
+.result-actions {
+  margin-bottom: 40px;
+}
+.study-result h2 {
+  margin-top: 32px;
+}
+.result-errors {
+  display: grid;
+  gap: 14px;
+}
+.result-errors article {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid #e3c4ca;
+  border-radius: 16px;
+  background: #fff;
+}
+.result-errors article div + div {
+  padding-top: 18px;
+  border-top: 1px solid #e2e6ef;
+}
+.result-errors span {
+  color: #66708a;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.result-errors p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.success-state {
+  color: #26713d;
+  background: #eaf8ee !important;
+}
 .card-skeleton {
   height: 160px;
   margin-top: 28px;
@@ -615,6 +705,12 @@ button:disabled {
     overflow: hidden;
     text-overflow: ellipsis;
     display: block;
+  }
+  .result-actions .button-link {
+    width: 100%;
+  }
+  .study-run-nav {
+    align-items: flex-start;
   }
 }
 @media (max-width: 767px) {

@@ -8,14 +8,15 @@ import (
 )
 
 var (
-	ErrFolderNotFound   = errors.New("folder not found")
-	ErrEmptyScope       = errors.New("study scope is empty")
-	ErrSessionNotFound  = errors.New("study session not found")
-	ErrNoActiveSession  = errors.New("active study session not found")
-	ErrPositionConflict = errors.New("study position is not current")
-	ErrNotRevealed      = errors.New("study position is not revealed")
-	ErrAnswerConflict   = errors.New("study position already has another answer")
-	ErrSessionInactive  = errors.New("study session is not active")
+	ErrFolderNotFound    = errors.New("folder not found")
+	ErrEmptyScope        = errors.New("study scope is empty")
+	ErrSessionNotFound   = errors.New("study session not found")
+	ErrNoActiveSession   = errors.New("active study session not found")
+	ErrPositionConflict  = errors.New("study position is not current")
+	ErrNotRevealed       = errors.New("study position is not revealed")
+	ErrAnswerConflict    = errors.New("study position already has another answer")
+	ErrSessionInactive   = errors.New("study session is not active")
+	ErrResultUnavailable = errors.New("study result is unavailable")
 )
 
 type Scope struct {
@@ -61,6 +62,23 @@ type SessionState struct {
 	AnsweredCount int              `json:"answeredCount"`
 	Status        string           `json:"status"`
 	Current       *CurrentPosition `json:"current"`
+}
+
+type ResultError struct {
+	CardID uuid.UUID `json:"cardId"`
+	Front  string    `json:"front"`
+	Back   string    `json:"back"`
+}
+
+type Result struct {
+	ID             uuid.UUID     `json:"id"`
+	ScopeType      string        `json:"scopeType"`
+	ScopeFolderID  *uuid.UUID    `json:"scopeFolderId"`
+	ActualCount    int           `json:"actualCount"`
+	CorrectCount   int           `json:"correctCount"`
+	IncorrectCount int           `json:"incorrectCount"`
+	CorrectPercent int           `json:"correctPercent"`
+	Errors         []ResultError `json:"errors"`
 }
 
 type Schedule struct {

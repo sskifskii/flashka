@@ -184,16 +184,7 @@ export function StudySessionRun() {
       </section>
     );
   if (session.status === "completed")
-    return (
-      <section className="content narrow state">
-        <span className="spark">✓</span>
-        <h1>Раунд завершён</h1>
-        <p>Все {session.actualCount} карточек оценены.</p>
-        <Link className="button-link" to="/app">
-          К коллекции
-        </Link>
-      </section>
-    );
+    return <Navigate to={`/app/study/${session.id}/result`} replace />;
   if (session.status === "abandoned") return <Navigate to="/app" replace />;
   if (!session.current)
     return (

@@ -76,6 +76,10 @@ func (s Service) Get(ctx context.Context, userID, sessionID uuid.UUID) (SessionS
 	return s.Repo.Get(ctx, userID, sessionID)
 }
 
+func (s Service) Result(ctx context.Context, userID, sessionID uuid.UUID) (Result, error) {
+	return s.Repo.Result(ctx, userID, sessionID)
+}
+
 func (s Service) Reveal(ctx context.Context, userID, sessionID uuid.UUID, position int) (SessionState, error) {
 	return s.Repo.Reveal(ctx, userID, sessionID, position, s.Clock.Now().UTC())
 }

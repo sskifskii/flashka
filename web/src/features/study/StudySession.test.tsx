@@ -69,6 +69,7 @@ it("hides the back until reveal and answers by keyboard", async () => {
     <MemoryRouter initialEntries={[`/app/study/${sessionId}`]}>
       <Routes>
         <Route path="/app/study/:id" element={<StudySessionRun />} />
+        <Route path="/app/study/:id/result" element={<div>Итог раунда</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -82,7 +83,7 @@ it("hides the back until reveal and answers by keyboard", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Показать ответ" }));
   expect(await screen.findByText("Ответ")).toBeVisible();
   await userEvent.keyboard("{ArrowRight}");
-  expect(await screen.findByText("Раунд завершён")).toBeVisible();
+  expect(await screen.findByText("Итог раунда")).toBeVisible();
 
   expect(fetchMock).toHaveBeenNthCalledWith(
     2,

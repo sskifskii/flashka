@@ -58,13 +58,19 @@ func (r Repository) Delete(ctx context.Context, userID, cardID uuid.UUID) error 
 	return err
 }
 
-func (r Repository) List(ctx context.Context, userID, folderID uuid.UUID, cursor *Cursor, limit int) ([]Summary, error) {
+func (r Repository) List(ctx context.Context, userID, folderID uuid.UUID, cursor *Cursor, limit int, now time.Time) ([]Summary, error) {
 	var rows pgx.Rows
 	var err error
 	if cursor == nil {
-		rows, err = r.Pool.Query(ctx, `SELECT id,front,back,created_at,updated_at FROM cards WHERE user_id=$1 AND folder_id=$2 ORDER BY created_at DESC,id DESC LIMIT $3`, userID, folderID, limit)
+		rows, err = r.Pool.Query(ctx, `SELECT id,front,back,CASE
+			WHEN due_at IS NULL THEN 'new' WHEN due_at <= $4 THEN 'due'
+			WHEN interval_days >= 30 THEN 'mastered' ELSE 'learning' END,created_at,updated_at
+			FROM cards WHERE user_id=$1 AND folder_id=$2 ORDER BY created_at DESC,id DESC LIMIT $3`, userID, folderID, limit, now)
 	} else {
-		rows, err = r.Pool.Query(ctx, `SELECT id,front,back,created_at,updated_at FROM cards WHERE user_id=$1 AND folder_id=$2 AND (created_at,id)<($3,$4) ORDER BY created_at DESC,id DESC LIMIT $5`, userID, folderID, cursor.CreatedAt, cursor.ID, limit)
+		rows, err = r.Pool.Query(ctx, `SELECT id,front,back,CASE
+			WHEN due_at IS NULL THEN 'new' WHEN due_at <= $6 THEN 'due'
+			WHEN interval_days >= 30 THEN 'mastered' ELSE 'learning' END,created_at,updated_at
+			FROM cards WHERE user_id=$1 AND folder_id=$2 AND (created_at,id)<($3,$4) ORDER BY created_at DESC,id DESC LIMIT $5`, userID, folderID, cursor.CreatedAt, cursor.ID, limit, now)
 	}
 	if err != nil {
 		return nil, err
@@ -73,7 +79,7 @@ func (r Repository) List(ctx context.Context, userID, folderID uuid.UUID, cursor
 	items := make([]Summary, 0, limit)
 	for rows.Next() {
 		var item Summary
-		if err = rows.Scan(&item.ID, &item.Front, &item.Back, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err = rows.Scan(&item.ID, &item.Front, &item.Back, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, item)

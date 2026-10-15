@@ -161,6 +161,46 @@ func (r Repository) Get(ctx context.Context, userID, sessionID uuid.UUID) (Sessi
 	return readState(ctx, r.Pool, userID, sessionID)
 }
 
+func (r Repository) Result(ctx context.Context, userID, sessionID uuid.UUID) (Result, error) {
+	var result Result
+	var status string
+	err := r.Pool.QueryRow(ctx, `SELECT s.id,s.scope_type,s.scope_folder_id,s.actual_count,s.status,
+		count(*) FILTER (WHERE sc.result='correct')::int,
+		count(*) FILTER (WHERE sc.result='incorrect')::int
+		FROM study_sessions s JOIN study_session_cards sc ON sc.session_id=s.id
+		WHERE s.user_id=$1 AND s.id=$2
+		GROUP BY s.id`, userID, sessionID).Scan(
+		&result.ID, &result.ScopeType, &result.ScopeFolderID, &result.ActualCount, &status,
+		&result.CorrectCount, &result.IncorrectCount,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Result{}, ErrSessionNotFound
+	}
+	if err != nil {
+		return Result{}, err
+	}
+	if status != "completed" {
+		return Result{}, ErrResultUnavailable
+	}
+	result.CorrectPercent = (result.CorrectCount*100 + result.ActualCount/2) / result.ActualCount
+	rows, err := r.Pool.Query(ctx, `SELECT c.id,c.front,c.back
+		FROM study_session_cards sc JOIN cards c ON c.user_id=$1 AND c.id=sc.card_id
+		WHERE sc.session_id=$2 AND sc.result='incorrect' ORDER BY sc.position`, userID, sessionID)
+	if err != nil {
+		return Result{}, err
+	}
+	defer rows.Close()
+	result.Errors = make([]ResultError, 0, result.IncorrectCount)
+	for rows.Next() {
+		var item ResultError
+		if err = rows.Scan(&item.CardID, &item.Front, &item.Back); err != nil {
+			return Result{}, err
+		}
+		result.Errors = append(result.Errors, item)
+	}
+	return result, rows.Err()
+}
+
 func lockSession(ctx context.Context, tx pgx.Tx, userID, sessionID uuid.UUID) (string, error) {
 	var status string
 	err := tx.QueryRow(ctx, `SELECT status FROM study_sessions WHERE user_id=$1 AND id=$2 FOR UPDATE`, userID, sessionID).Scan(&status)

@@ -3,6 +3,7 @@ export type CardSummary = {
   id: string;
   front: string;
   back: string;
+  status: "new" | "learning" | "due" | "mastered";
   createdAt: string;
   updatedAt: string;
 };
@@ -57,6 +58,16 @@ export type StudySessionState = {
     back: string | null;
     revealed: boolean;
   } | null;
+};
+export type StudyResult = {
+  id: string;
+  scopeType: "all" | "folder";
+  scopeFolderId: string | null;
+  actualCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  correctPercent: number;
+  errors: { cardId: string; front: string; back: string }[];
 };
 export type APIError = {
   error: {
@@ -199,6 +210,8 @@ export const api = {
     ),
   studySession: (id: string) =>
     request<{ session: StudySessionState }>(`/study/sessions/${id}`),
+  studyResult: (id: string) =>
+    request<{ result: StudyResult }>(`/study/sessions/${id}/result`),
   revealStudyPosition: (id: string, position: number) =>
     request<{ session: StudySessionState }>(
       `/study/sessions/${id}/cards/${position}/reveal`,

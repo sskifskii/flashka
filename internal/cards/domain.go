@@ -30,6 +30,7 @@ type Card struct {
 	IntervalDays   *int       `json:"intervalDays"`
 	LastReviewedAt *time.Time `json:"lastReviewedAt"`
 	DueAt          *time.Time `json:"dueAt"`
+	Status         string     `json:"status"`
 	CreatedAt      time.Time  `json:"createdAt"`
 	UpdatedAt      time.Time  `json:"updatedAt"`
 }
@@ -38,8 +39,22 @@ type Summary struct {
 	ID        uuid.UUID `json:"id"`
 	Front     string    `json:"front"`
 	Back      string    `json:"back"`
+	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+func ProgressStatus(intervalDays *int, dueAt *time.Time, now time.Time) string {
+	if dueAt == nil {
+		return "new"
+	}
+	if !dueAt.After(now) {
+		return "due"
+	}
+	if intervalDays != nil && *intervalDays >= 30 {
+		return "mastered"
+	}
+	return "learning"
 }
 
 func NormalizeSide(value string) (string, string) {

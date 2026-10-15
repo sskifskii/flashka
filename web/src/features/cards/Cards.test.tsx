@@ -11,6 +11,7 @@ describe("cards UI", () => {
     id,
     front,
     back: `${front} back`,
+    status: "new" as const,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
@@ -112,6 +113,7 @@ describe("cards UI", () => {
     ).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Повторить" }));
     expect(await screen.findByText("first")).toBeVisible();
+    expect(screen.getByText("Новая")).toBeVisible();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(cardsMock).toHaveBeenCalledTimes(2);
   });

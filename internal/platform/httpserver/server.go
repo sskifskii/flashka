@@ -87,6 +87,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, service auth.Service, log *slog.
 			r.Get("/sessions/active", s.activeStudySession)
 			r.Route("/sessions/{sessionId}", func(r chi.Router) {
 				r.Get("/", s.getStudySession)
+				r.Get("/result", s.studySessionResult)
 				r.With(s.csrf).Post("/cards/{position}/reveal", s.revealStudyPosition)
 				r.With(s.csrf).Put("/cards/{position}/answer", s.answerStudyPosition)
 				r.With(s.csrf).Post("/abandon", s.abandonStudySession)
@@ -201,6 +202,23 @@ func (s *Server) getStudySession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{"session": state})
+}
+
+func (s *Server) studySessionResult(w http.ResponseWriter, r *http.Request) {
+	id, ok := studySessionID(r)
+	if !ok {
+		writeError(w, r, 404, "study_session_not_found", "Сессия не найдена", nil)
+		return
+	}
+	result, err := s.study.Result(r.Context(), currentUserID(r), id)
+	if errors.Is(err, study.ErrResultUnavailable) {
+		writeError(w, r, 409, "study_result_unavailable", "Итог доступен после завершения сессии", nil)
+		return
+	}
+	if s.writeStudyRunError(w, r, err) {
+		return
+	}
+	writeJSON(w, 200, map[string]any{"result": result})
 }
 
 func (s *Server) revealStudyPosition(w http.ResponseWriter, r *http.Request) {

@@ -126,6 +126,35 @@ func TestRepositoryPreviewAndCreateUseOwnedRecursiveFixedScope(t *testing.T) {
 	if events != 1 || correct != 2 || interval != 3 || !dueAt.Equal(answeredAt.AddDate(0, 0, 3)) {
 		t.Fatalf("events=%d correct=%d interval=%d due=%s", events, correct, interval, dueAt)
 	}
+	if _, err = repo.Result(ctx, userID, session.ID); !errors.Is(err, ErrResultUnavailable) {
+		t.Fatalf("active result err=%v", err)
+	}
+	for position := 2; position <= session.ActualCount; position++ {
+		if _, err = repo.Reveal(ctx, userID, session.ID, position, answeredAt); err != nil {
+			t.Fatal(err)
+		}
+		rating := "correct"
+		if position == 2 {
+			rating = "incorrect"
+		}
+		if _, err = repo.Answer(ctx, userID, session.ID, position, rating, answeredAt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	result, err := repo.Result(ctx, userID, session.ID)
+	if err != nil || result.CorrectCount != 2 || result.IncorrectCount != 1 || result.CorrectPercent != 67 || len(result.Errors) != 1 {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	if _, err = pool.Exec(ctx, `DELETE FROM cards WHERE user_id=$1 AND id=$2`, userID, result.Errors[0].CardID); err != nil {
+		t.Fatal(err)
+	}
+	result, err = repo.Result(ctx, userID, session.ID)
+	if err != nil || result.IncorrectCount != 1 || len(result.Errors) != 0 {
+		t.Fatalf("result after deleted card=%#v err=%v", result, err)
+	}
+	if _, err = repo.Result(ctx, otherUserID, session.ID); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("cross-tenant result err=%v", err)
+	}
 	if _, err = repo.Get(ctx, otherUserID, session.ID); !errors.Is(err, ErrSessionNotFound) {
 		t.Fatalf("cross-tenant session err=%v", err)
 	}

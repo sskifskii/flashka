@@ -51,11 +51,19 @@ func (s Service) Create(ctx context.Context, userID uuid.UUID, folderID *uuid.UU
 	if err != nil {
 		return Card{}, nil, err
 	}
-	c, err := s.Repo.Create(ctx, id, userID, folder, front, back, s.Clock.Now().UTC())
+	now := s.Clock.Now().UTC()
+	c, err := s.Repo.Create(ctx, id, userID, folder, front, back, now)
+	if err == nil {
+		c.Status = ProgressStatus(c.IntervalDays, c.DueAt, now)
+	}
 	return c, nil, err
 }
 func (s Service) Get(ctx context.Context, userID, cardID uuid.UUID) (Card, error) {
-	return s.Repo.Get(ctx, userID, cardID)
+	c, err := s.Repo.Get(ctx, userID, cardID)
+	if err == nil {
+		c.Status = ProgressStatus(c.IntervalDays, c.DueAt, s.Clock.Now().UTC())
+	}
+	return c, err
 }
 func (s Service) Update(ctx context.Context, userID, cardID uuid.UUID, front, back *string, folderID *uuid.UUID) (Card, FieldErrors, error) {
 	if front == nil && back == nil && folderID == nil {
@@ -83,7 +91,11 @@ func (s Service) Update(ctx context.Context, userID, cardID uuid.UUID, front, ba
 	if fields != nil {
 		return Card{}, fields, nil
 	}
-	c, err := s.Repo.Update(ctx, userID, cardID, folder, f, b, s.Clock.Now().UTC())
+	now := s.Clock.Now().UTC()
+	c, err := s.Repo.Update(ctx, userID, cardID, folder, f, b, now)
+	if err == nil {
+		c.Status = ProgressStatus(c.IntervalDays, c.DueAt, now)
+	}
 	return c, nil, err
 }
 func (s Service) Delete(ctx context.Context, userID, cardID uuid.UUID) error {
@@ -98,7 +110,7 @@ func (s Service) List(ctx context.Context, userID uuid.UUID, folderID *uuid.UUID
 	if err != nil {
 		return nil, "", err
 	}
-	items, err := s.Repo.List(ctx, userID, folder, c, limit+1)
+	items, err := s.Repo.List(ctx, userID, folder, c, limit+1, s.Clock.Now().UTC())
 	if err != nil {
 		return nil, "", err
 	}

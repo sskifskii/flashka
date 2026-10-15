@@ -62,11 +62,11 @@ func TestRepositoryCRUDPaginationAndTenantIsolation(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	first, err := repo.List(context.Background(), u1, f1, nil, 2)
-	if err != nil || len(first) != 2 || first[0].ID != cards[2].ID || first[1].ID != cards[1].ID {
+	first, err := repo.List(context.Background(), u1, f1, nil, 2, base)
+	if err != nil || len(first) != 2 || first[0].ID != cards[2].ID || first[1].ID != cards[1].ID || first[0].Status != "new" {
 		t.Fatalf("page=%#v err=%v", first, err)
 	}
-	second, err := repo.List(context.Background(), u1, f1, &Cursor{CreatedAt: first[1].CreatedAt, ID: first[1].ID}, 2)
+	second, err := repo.List(context.Background(), u1, f1, &Cursor{CreatedAt: first[1].CreatedAt, ID: first[1].ID}, 2, base)
 	if err != nil || len(second) != 1 || second[0].ID != cards[0].ID {
 		t.Fatalf("second=%#v err=%v", second, err)
 	}

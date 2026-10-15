@@ -20,6 +20,21 @@ import {
 } from "../folders/Folders";
 import { normalizeSide, validateSide } from "./validation";
 
+const statusLabels: Record<CardSummary["status"], string> = {
+  new: "Новая",
+  learning: "Изучается",
+  due: "К повторению",
+  mastered: "Освоена",
+};
+
+function localDate(value: string | null) {
+  return value
+    ? new Intl.DateTimeFormat("ru", { dateStyle: "medium" }).format(
+        new Date(value),
+      )
+    : "—";
+}
+
 function ErrorBox({ message, retry }: { message: string; retry?: () => void }) {
   return (
     <div className="state error-state" role="alert">
@@ -179,6 +194,9 @@ export function CardList() {
                 to={`/app/cards/${card.id}`}
                 key={card.id}
               >
+                <small className={`status-badge status-${card.status}`}>
+                  {statusLabels[card.status]}
+                </small>
                 <strong>{card.front}</strong>
                 <span>{card.back}</span>
               </Link>
@@ -511,11 +529,40 @@ export function CardDetail() {
       ) : (
         <>
           <article className="detail">
+            <small className={`status-badge status-${card.status}`}>
+              {statusLabels[card.status]}
+            </small>
             <h2>Лицевая сторона</h2>
             <p>{card.front}</p>
             <h2>Обратная сторона</h2>
             <p>{card.back}</p>
           </article>
+          <dl className="card-progress">
+            <div>
+              <dt>Правильных ответов</dt>
+              <dd>{card.correctCount}</dd>
+            </div>
+            <div>
+              <dt>Ошибок</dt>
+              <dd>{card.incorrectCount}</dd>
+            </div>
+            <div>
+              <dt>Текущая серия</dt>
+              <dd>{card.correctStreak}</dd>
+            </div>
+            <div>
+              <dt>Интервал</dt>
+              <dd>{card.intervalDays ? `${card.intervalDays} дн.` : "—"}</dd>
+            </div>
+            <div>
+              <dt>Последний ответ</dt>
+              <dd>{localDate(card.lastReviewedAt)}</dd>
+            </div>
+            <div>
+              <dt>Следующее повторение</dt>
+              <dd>{localDate(card.dueAt)}</dd>
+            </div>
+          </dl>
           {errors.form && (
             <p className="form-error" role="alert">
               {errors.form}

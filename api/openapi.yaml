@@ -244,6 +244,20 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "404": { $ref: "#/components/responses/AuthError" }
         "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions/{sessionId}/result:
+    parameters:
+      - { $ref: "#/components/parameters/StudySessionID" }
+    get:
+      summary: Get the totals and surviving incorrect cards for a completed session
+      operationId: getStudySessionResult
+      responses:
+        "200":
+          description: Completed session result; deleted cards are omitted from errors.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudyResultEnvelope" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
   /api/v1/study/sessions/{sessionId}/cards/{position}/reveal:
     parameters:
       - { $ref: "#/components/parameters/StudySessionID" }
@@ -413,17 +427,18 @@ components:
     CardSummary:
       type: object
       additionalProperties: false
-      required: [id, front, back, createdAt, updatedAt]
+      required: [id, front, back, status, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         front: { $ref: "#/components/schemas/CardSide" }
         back: { $ref: "#/components/schemas/CardSide" }
+        status: { $ref: "#/components/schemas/CardProgressStatus" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     Card:
       type: object
       additionalProperties: false
-      required: [id, folderId, front, back, correctCount, incorrectCount, correctStreak, intervalDays, lastReviewedAt, dueAt, createdAt, updatedAt]
+      required: [id, folderId, front, back, correctCount, incorrectCount, correctStreak, intervalDays, lastReviewedAt, dueAt, status, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         folderId: { type: string, format: uuid }
@@ -435,6 +450,7 @@ components:
         intervalDays: { type: [integer, "null"], minimum: 1 }
         lastReviewedAt: { type: [string, "null"], format: date-time }
         dueAt: { type: [string, "null"], format: date-time }
+        status: { $ref: "#/components/schemas/CardProgressStatus" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     CardEnvelope:
@@ -443,6 +459,10 @@ components:
       required: [card]
       properties:
         card: { $ref: "#/components/schemas/Card" }
+    CardProgressStatus:
+      type: string
+      enum: [new, learning, due, mastered]
+      description: Server-calculated status at the current UTC time.
     CardList:
       type: object
       additionalProperties: false
@@ -585,6 +605,33 @@ components:
       required: [session]
       properties:
         session: { $ref: "#/components/schemas/StudySessionState" }
+    StudyResultError:
+      type: object
+      additionalProperties: false
+      required: [cardId, front, back]
+      properties:
+        cardId: { type: string, format: uuid }
+        front: { $ref: "#/components/schemas/CardSide" }
+        back: { $ref: "#/components/schemas/CardSide" }
+    StudyResult:
+      type: object
+      additionalProperties: false
+      required: [id, scopeType, scopeFolderId, actualCount, correctCount, incorrectCount, correctPercent, errors]
+      properties:
+        id: { type: string, format: uuid }
+        scopeType: { type: string, enum: [all, folder] }
+        scopeFolderId: { type: [string, "null"], format: uuid }
+        actualCount: { type: integer, minimum: 1, maximum: 100 }
+        correctCount: { type: integer, minimum: 0, maximum: 100 }
+        incorrectCount: { type: integer, minimum: 0, maximum: 100 }
+        correctPercent: { type: integer, minimum: 0, maximum: 100 }
+        errors: { type: array, items: { $ref: "#/components/schemas/StudyResultError" } }
+    StudyResultEnvelope:
+      type: object
+      additionalProperties: false
+      required: [result]
+      properties:
+        result: { $ref: "#/components/schemas/StudyResult" }
     StudyAnswer:
       type: object
       additionalProperties: false
