@@ -210,6 +210,17 @@ func TestAuthHTTPContract(t *testing.T) {
 	if status, _, _ = request("DELETE", "/api/v1/folders/"+topicID, nil); status != 204 {
 		t.Fatalf("delete topic=%d", status)
 	}
+	status, body, _ = request("GET", "/api/v1/study/preview?scopeType=all", nil)
+	preview, _ := body["preview"].(map[string]any)
+	if status != 200 || preview["available"] != float64(2) || preview["new"] != float64(2) {
+		t.Fatalf("study preview=%d %#v", status, body)
+	}
+	status, body, _ = request("POST", "/api/v1/study/sessions", map[string]any{"scopeType": "all", "count": 10})
+	session, _ := body["session"].(map[string]any)
+	first, _ := session["first"].(map[string]any)
+	if status != 201 || session["actualCount"] != float64(2) || first["position"] != float64(1) || first["front"] == nil {
+		t.Fatalf("create study session=%d %#v", status, body)
+	}
 	now := time.Now().UTC()
 	otherUser, otherFolder, otherCard := uuid.New(), uuid.New(), uuid.New()
 	if _, err = pool.Exec(context.Background(), `INSERT INTO users(id,login,login_normalized,password_hash,created_at,updated_at) VALUES($1,'OtherUser','otheruser','hash',$2,$2)`, otherUser, now); err != nil {
@@ -232,6 +243,7 @@ func TestAuthHTTPContract(t *testing.T) {
 		{"POST", "/api/v1/folders", map[string]string{"parentId": otherFolder.String(), "name": "No"}},
 		{"PATCH", "/api/v1/folders/" + otherFolder.String(), map[string]string{"name": "No"}},
 		{"DELETE", "/api/v1/folders/" + otherFolder.String(), nil},
+		{"GET", "/api/v1/study/preview?scopeType=folder&folderId=" + otherFolder.String(), nil},
 	} {
 		if status, body, _ = request(test.method, test.path, test.body); status != 404 || errorCode(body) != "folder_not_found" {
 			t.Fatalf("foreign folder %s %s=%d %#v", test.method, test.path, status, body)

@@ -29,6 +29,22 @@ export type FolderNode = Omit<Folder, "parentId"> & {
   totalCardCount: number;
   children: FolderNode[];
 };
+export type StudyPreview = {
+  available: number;
+  due: number;
+  new: number;
+  mastered: number;
+};
+export type StudySession = {
+  id: string;
+  scopeType: "all" | "folder";
+  scopeFolderId: string | null;
+  requestedCount: number;
+  actualCount: number;
+  status: "active";
+  createdAt: string;
+  first: { position: number; cardId: string; front: string };
+};
 export type APIError = {
   error: {
     code: string;
@@ -139,4 +155,19 @@ export const api = {
     }),
   deleteFolder: (id: string) =>
     request<void>(`/folders/${id}`, { method: "DELETE" }, 204),
+  studyPreview: (scopeType: "all" | "folder", folderId?: string) => {
+    const params = new URLSearchParams({ scopeType });
+    if (folderId) params.set("folderId", folderId);
+    return request<{ preview: StudyPreview }>(`/study/preview?${params}`);
+  },
+  createStudySession: (value: {
+    scopeType: "all" | "folder";
+    folderId?: string;
+    count: number;
+  }) =>
+    request<{ session: StudySession }>(
+      "/study/sessions",
+      { method: "POST", body: JSON.stringify(value) },
+      201,
+    ),
 };

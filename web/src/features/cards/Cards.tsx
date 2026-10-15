@@ -134,12 +134,20 @@ export function CardList() {
             <p className="eyebrow">{selected?.name ?? "Папка"}</p>
             <h1>Карточки</h1>
           </div>
-          <Link
-            className="button-link"
-            to={`/app/cards/new${requestedFolder ? `?folderId=${requestedFolder}` : ""}`}
-          >
-            Добавить карточку
-          </Link>
+          <div className="title-actions">
+            <Link
+              className="button-link secondary-link"
+              to={`/app/study/new${requestedFolder ? `?folderId=${requestedFolder}` : ""}`}
+            >
+              Учить
+            </Link>
+            <Link
+              className="button-link"
+              to={`/app/cards/new${requestedFolder ? `?folderId=${requestedFolder}` : ""}`}
+            >
+              Добавить карточку
+            </Link>
+          </div>
         </div>
         {(loading || switchingFolder) && (
           <div className="card-skeleton" aria-label="Загрузка карточек" />

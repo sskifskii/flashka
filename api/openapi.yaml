@@ -187,6 +187,39 @@ paths:
         "403": { $ref: "#/components/responses/AuthError" }
         "404": { $ref: "#/components/responses/AuthError" }
         "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/preview:
+    get:
+      summary: Preview the current scheduling counts for a study scope
+      operationId: previewStudySession
+      parameters:
+        - { name: scopeType, in: query, required: true, schema: { type: string, enum: [all, folder] } }
+        - { name: folderId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Counts at the server's current UTC time; mastered may overlap due.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudyPreviewEnvelope" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions:
+    post:
+      summary: Atomically create an ordered fixed study session
+      operationId: createStudySession
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/StudySessionCreate" } } }
+      responses:
+        "201":
+          description: Session and its selected positions were created atomically.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudySessionEnvelope" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
   /health/live:
     get:
       summary: Check whether the HTTP process is alive
@@ -388,6 +421,56 @@ components:
       required: [root]
       properties:
         root: { $ref: "#/components/schemas/FolderNode" }
+    StudyPreview:
+      type: object
+      additionalProperties: false
+      required: [available, due, new, mastered]
+      properties:
+        available: { type: integer, minimum: 0 }
+        due: { type: integer, minimum: 0 }
+        new: { type: integer, minimum: 0 }
+        mastered: { type: integer, minimum: 0 }
+    StudyPreviewEnvelope:
+      type: object
+      additionalProperties: false
+      required: [preview]
+      properties:
+        preview: { $ref: "#/components/schemas/StudyPreview" }
+    StudySessionCreate:
+      type: object
+      additionalProperties: false
+      required: [scopeType, count]
+      properties:
+        scopeType: { type: string, enum: [all, folder] }
+        folderId: { type: string, format: uuid }
+        count: { type: integer, minimum: 1, maximum: 100 }
+    StudyPosition:
+      type: object
+      additionalProperties: false
+      required: [position, cardId, front]
+      properties:
+        position: { type: integer, minimum: 1 }
+        cardId: { type: string, format: uuid }
+        front: { $ref: "#/components/schemas/CardSide" }
+    StudySession:
+      type: object
+      additionalProperties: false
+      required: [id, scopeType, scopeFolderId, requestedCount, actualCount, status, createdAt, first]
+      properties:
+        id: { type: string, format: uuid }
+        scopeType: { type: string, enum: [all, folder] }
+        scopeFolderId: { type: [string, "null"], format: uuid }
+        requestedCount: { type: integer, minimum: 1, maximum: 100 }
+        actualCount: { type: integer, minimum: 1, maximum: 100 }
+        status: { type: string, const: active }
+        createdAt: { type: string, format: date-time }
+        first: { $ref: "#/components/schemas/StudyPosition" }
+    StudySessionEnvelope:
+      type: object
+      additionalProperties: false
+      required: [session]
+      properties:
+        session: { $ref: "#/components/schemas/StudySession" }
   responses:
     RegisterCreated:
       description: User, Inbox and session were created atomically.

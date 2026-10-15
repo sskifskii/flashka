@@ -10,6 +10,8 @@ import {
 import { useAuth } from "../features/auth/AuthProvider";
 import { AuthForm } from "../features/auth/AuthForm";
 import { CardDetail, CardList, NewCard } from "../features/cards/Cards";
+import { StudySetup } from "../features/study/StudySetup";
+import { StudySessionStart } from "../features/study/StudySession";
 function Loading() {
   return (
     <main className="loading" aria-live="polite">
@@ -112,6 +114,8 @@ export function App() {
           <Route index element={<CardList />} />
           <Route path="cards/new" element={<NewCard />} />
           <Route path="cards/:id" element={<CardDetail />} />
+          <Route path="study/new" element={<StudySetup />} />
+          <Route path="study/:id" element={<StudySessionStart />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/app" replace />} />

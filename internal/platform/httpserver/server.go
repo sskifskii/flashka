@@ -24,6 +24,7 @@ import (
 	"github.com/skif/flashka/internal/cards"
 	"github.com/skif/flashka/internal/folders"
 	"github.com/skif/flashka/internal/platform/config"
+	"github.com/skif/flashka/internal/study"
 )
 
 type ctxKey string
@@ -41,12 +42,13 @@ type Server struct {
 	auth    auth.Service
 	cards   cards.Service
 	folders folders.Service
+	study   study.Service
 	limiter *auth.LoginLimiter
 	log     *slog.Logger
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, service auth.Service, log *slog.Logger) http.Handler {
-	s := &Server{cfg: cfg, pool: pool, auth: service, cards: cards.Service{Repo: cards.Repository{Pool: pool}, Clock: service.Clock}, folders: folders.Service{Repo: folders.Repository{Pool: pool}, Clock: service.Clock}, limiter: auth.NewLoginLimiter(service.Clock), log: log}
+	s := &Server{cfg: cfg, pool: pool, auth: service, cards: cards.Service{Repo: cards.Repository{Pool: pool}, Clock: service.Clock}, folders: folders.Service{Repo: folders.Repository{Pool: pool}, Clock: service.Clock}, study: study.Service{Repo: study.Repository{Pool: pool}, Clock: service.Clock}, limiter: auth.NewLoginLimiter(service.Clock), log: log}
 	r := chi.NewRouter()
 	r.Use(s.requestContext, s.accessLog, s.recoverer, s.security)
 	r.Get("/health/live", s.live)
@@ -78,9 +80,84 @@ func New(cfg config.Config, pool *pgxpool.Pool, service auth.Service, log *slog.
 				r.With(s.csrf).Delete("/", s.deleteFolder)
 			})
 		})
+		r.Route("/study", func(r chi.Router) {
+			r.Use(s.authenticated)
+			r.Get("/preview", s.studyPreview)
+			r.With(s.csrf).Post("/sessions", s.createStudySession)
+		})
 	})
 	r.Handle("/*", s.frontend())
 	return r
+}
+
+type createStudySessionInput struct {
+	ScopeType string  `json:"scopeType"`
+	FolderID  *string `json:"folderId"`
+	Count     int     `json:"count"`
+}
+
+func studyScope(w http.ResponseWriter, r *http.Request, rawFolder *string) (*uuid.UUID, bool) {
+	folderID, ok := optionalUUID(w, r, rawFolder, "folderId")
+	if !ok {
+		return nil, false
+	}
+	return folderID, true
+}
+
+func (s *Server) studyPreview(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	var rawFolder *string
+	if q.Has("folderId") {
+		value := q.Get("folderId")
+		rawFolder = &value
+	}
+	folderID, ok := studyScope(w, r, rawFolder)
+	if !ok {
+		return
+	}
+	preview, fields, err := s.study.Preview(r.Context(), currentUserID(r), q.Get("scopeType"), folderID)
+	if fields != nil {
+		writeError(w, r, 422, "validation_failed", "Проверьте параметры", fields)
+		return
+	}
+	if errors.Is(err, study.ErrFolderNotFound) {
+		writeError(w, r, 404, "folder_not_found", "Папка не найдена", nil)
+		return
+	}
+	if err != nil {
+		s.internal(w, r, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"preview": preview})
+}
+
+func (s *Server) createStudySession(w http.ResponseWriter, r *http.Request) {
+	var in createStudySessionInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	folderID, ok := studyScope(w, r, in.FolderID)
+	if !ok {
+		return
+	}
+	session, fields, err := s.study.Create(r.Context(), currentUserID(r), in.ScopeType, folderID, in.Count)
+	if fields != nil {
+		writeError(w, r, 422, "validation_failed", "Проверьте параметры", fields)
+		return
+	}
+	if errors.Is(err, study.ErrFolderNotFound) {
+		writeError(w, r, 404, "folder_not_found", "Папка не найдена", nil)
+		return
+	}
+	if errors.Is(err, study.ErrEmptyScope) {
+		writeError(w, r, 409, "empty_study_scope", "В выбранной области нет карточек", nil)
+		return
+	}
+	if err != nil {
+		s.internal(w, r, err)
+		return
+	}
+	writeJSON(w, 201, map[string]any{"session": session})
 }
 
 func (s *Server) authenticated(next http.Handler) http.Handler {

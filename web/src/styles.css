@@ -71,7 +71,8 @@ label {
   margin-top: 10px;
 }
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   min-height: 48px;
   padding: 11px 13px;
@@ -289,6 +290,67 @@ button:disabled {
   gap: 12px;
   flex-wrap: wrap;
 }
+.title-actions,
+.quick-counts {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.study-form {
+  margin-top: 24px;
+}
+.study-form fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 18px;
+  border: 1px solid #dfe4f0;
+  border-radius: 14px;
+}
+.study-form legend {
+  font-weight: 700;
+}
+.quick-counts button {
+  min-width: 64px;
+  margin: 0;
+}
+.quick-counts button.selected {
+  background: #3157d5;
+}
+.field-hint {
+  color: #66708a;
+  margin: 0;
+  font-size: 0.9rem;
+}
+.study-preview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #dfe4f0;
+  border-radius: 14px;
+}
+.study-preview p {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  color: #264bc3;
+  font-weight: 700;
+}
+.state.compact {
+  margin: 18px 0 0;
+  padding: 20px;
+  background: #fff7dc;
+  border-radius: 14px;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
 .title-row h1,
 .content > h1 {
   margin-top: 8px;
@@ -460,6 +522,9 @@ button:disabled {
     align-items: flex-end;
   }
   .title-row .button-link {
+    width: 100%;
+  }
+  .title-actions {
     width: 100%;
   }
   .user-login {
