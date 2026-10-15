@@ -58,24 +58,83 @@ paths:
         "200": { $ref: "#/components/responses/CurrentUser" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/folders/tree:
+    get:
+      summary: Read the current user's complete folder tree and card counts
+      operationId: getFolderTree
+      responses:
+        "200":
+          description: Complete tree rooted at Inbox.
+          content: { application/json: { schema: { $ref: "#/components/schemas/FolderTreeEnvelope" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/folders:
+    post:
+      summary: Create a child folder
+      operationId: createFolder
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/FolderCreate" } } }
+      responses:
+        "201":
+          description: Folder created.
+          content: { application/json: { schema: { $ref: "#/components/schemas/FolderEnvelope" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/folders/{folderId}:
+    parameters:
+      - { name: folderId, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Rename or move an owned non-Inbox folder
+      operationId: updateFolder
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/FolderPatch" } } }
+      responses:
+        "200":
+          description: Folder updated.
+          content: { application/json: { schema: { $ref: "#/components/schemas/FolderEnvelope" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+    delete:
+      summary: Delete an empty owned non-Inbox folder
+      operationId: deleteFolder
+      responses:
+        "204": { description: Empty folder deleted; response has no body. }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
   /api/v1/cards:
     get:
-      summary: List the current user's Inbox cards
+      summary: List cards directly in an owned folder, defaulting to Inbox
       operationId: listCards
       parameters:
         - { name: cursor, in: query, schema: { type: string } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
-        - { name: folderId, in: query, description: Reserved for SPEC-0003 and currently rejected., schema: { type: string, format: uuid } }
+        - { name: folderId, in: query, description: Owned folder; Inbox when omitted., schema: { type: string, format: uuid } }
       responses:
         "200":
           description: Stable page ordered by creation time and UUID descending.
           content: { application/json: { schema: { $ref: "#/components/schemas/CardList" } } }
         "400": { $ref: "#/components/responses/AuthError" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/AuthError" }
         "422": { $ref: "#/components/responses/AuthError" }
         "500": { $ref: "#/components/responses/AuthError" }
     post:
-      summary: Create a card in the current user's Inbox
+      summary: Create a card in an owned folder, defaulting to Inbox
       operationId: createCard
       requestBody:
         required: true
@@ -87,6 +146,7 @@ paths:
         "400": { $ref: "#/components/responses/AuthError" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
         "422": { $ref: "#/components/responses/AuthError" }
         "500": { $ref: "#/components/responses/AuthError" }
   /api/v1/cards/{cardId}:
@@ -103,7 +163,7 @@ paths:
         "404": { $ref: "#/components/responses/AuthError" }
         "500": { $ref: "#/components/responses/AuthError" }
     patch:
-      summary: Update one or both text sides of an owned card
+      summary: Update text and/or move an owned card
       operationId: updateCard
       requestBody:
         required: true
@@ -223,6 +283,7 @@ components:
       properties:
         front: { $ref: "#/components/schemas/CardSide" }
         back: { $ref: "#/components/schemas/CardSide" }
+        folderId: { type: string, format: uuid, description: Defaults to Inbox when omitted. }
     CardPatch:
       type: object
       additionalProperties: false
@@ -230,6 +291,7 @@ components:
       properties:
         front: { $ref: "#/components/schemas/CardSide" }
         back: { $ref: "#/components/schemas/CardSide" }
+        folderId: { type: string, format: uuid }
     CardSummary:
       type: object
       additionalProperties: false
@@ -270,6 +332,62 @@ components:
       properties:
         items: { type: array, items: { $ref: "#/components/schemas/CardSummary" } }
         nextCursor: { type: [string, "null"] }
+    FolderName:
+      type: string
+      minLength: 1
+      maxLength: 80
+      description: Trimmed at Unicode White_Space edges and unique case-insensitively among siblings.
+    Folder:
+      type: object
+      additionalProperties: false
+      required: [id, parentId, name, isInbox, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        parentId: { type: string, format: uuid }
+        name: { $ref: "#/components/schemas/FolderName" }
+        isInbox: { type: boolean, const: false }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    FolderNode:
+      type: object
+      additionalProperties: false
+      required: [id, parentId, name, isInbox, directCardCount, totalCardCount, createdAt, updatedAt, children]
+      properties:
+        id: { type: string, format: uuid }
+        parentId: { type: [string, "null"], format: uuid }
+        name: { $ref: "#/components/schemas/FolderName" }
+        isInbox: { type: boolean }
+        directCardCount: { type: integer, minimum: 0 }
+        totalCardCount: { type: integer, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        children: { type: array, items: { $ref: "#/components/schemas/FolderNode" } }
+    FolderCreate:
+      type: object
+      additionalProperties: false
+      required: [parentId, name]
+      properties:
+        parentId: { type: string, format: uuid }
+        name: { $ref: "#/components/schemas/FolderName" }
+    FolderPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        parentId: { type: string, format: uuid }
+        name: { $ref: "#/components/schemas/FolderName" }
+    FolderEnvelope:
+      type: object
+      additionalProperties: false
+      required: [folder]
+      properties:
+        folder: { $ref: "#/components/schemas/Folder" }
+    FolderTreeEnvelope:
+      type: object
+      additionalProperties: false
+      required: [root]
+      properties:
+        root: { $ref: "#/components/schemas/FolderNode" }
   responses:
     RegisterCreated:
       description: User, Inbox and session were created atomically.

@@ -10,6 +10,7 @@
 |---|---|---|---|
 | [SPEC-0001](0001-authentication.md) | Регистрация и вход | Implemented | — |
 | [SPEC-0002](0002-cards.md) | Карточки | Implemented | — |
+| [SPEC-0003](0003-folders.md) | Папки | Implemented | — |
 
 При создании или смене статуса spec обновляйте эту таблицу в том же изменении.
 

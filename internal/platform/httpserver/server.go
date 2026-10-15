@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/skif/flashka/internal/auth"
 	"github.com/skif/flashka/internal/cards"
+	"github.com/skif/flashka/internal/folders"
 	"github.com/skif/flashka/internal/platform/config"
 )
 
@@ -39,12 +40,13 @@ type Server struct {
 	pool    *pgxpool.Pool
 	auth    auth.Service
 	cards   cards.Service
+	folders folders.Service
 	limiter *auth.LoginLimiter
 	log     *slog.Logger
 }
 
 func New(cfg config.Config, pool *pgxpool.Pool, service auth.Service, log *slog.Logger) http.Handler {
-	s := &Server{cfg: cfg, pool: pool, auth: service, cards: cards.Service{Repo: cards.Repository{Pool: pool}, Clock: service.Clock}, limiter: auth.NewLoginLimiter(service.Clock), log: log}
+	s := &Server{cfg: cfg, pool: pool, auth: service, cards: cards.Service{Repo: cards.Repository{Pool: pool}, Clock: service.Clock}, folders: folders.Service{Repo: folders.Repository{Pool: pool}, Clock: service.Clock}, limiter: auth.NewLoginLimiter(service.Clock), log: log}
 	r := chi.NewRouter()
 	r.Use(s.requestContext, s.accessLog, s.recoverer, s.security)
 	r.Get("/health/live", s.live)
@@ -65,6 +67,15 @@ func New(cfg config.Config, pool *pgxpool.Pool, service auth.Service, log *slog.
 				r.Get("/", s.getCard)
 				r.With(s.csrf).Patch("/", s.updateCard)
 				r.With(s.csrf).Delete("/", s.deleteCard)
+			})
+		})
+		r.Route("/folders", func(r chi.Router) {
+			r.Use(s.authenticated)
+			r.Get("/tree", s.folderTree)
+			r.With(s.csrf).Post("/", s.createFolder)
+			r.Route("/{folderId}", func(r chi.Router) {
+				r.With(s.csrf).Patch("/", s.updateFolder)
+				r.With(s.csrf).Delete("/", s.deleteFolder)
 			})
 		})
 	})
@@ -104,12 +115,14 @@ func currentUserID(r *http.Request) uuid.UUID {
 }
 
 type createCardInput struct {
-	Front string `json:"front"`
-	Back  string `json:"back"`
+	Front    string  `json:"front"`
+	Back     string  `json:"back"`
+	FolderID *string `json:"folderId"`
 }
 type updateCardInput struct {
-	Front *string `json:"front"`
-	Back  *string `json:"back"`
+	Front    *string `json:"front"`
+	Back     *string `json:"back"`
+	FolderID *string `json:"folderId"`
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, out any) bool {
@@ -138,9 +151,14 @@ func cardID(r *http.Request) (uuid.UUID, bool) {
 
 func (s *Server) listCards(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	var folderID *uuid.UUID
 	if q.Has("folderId") {
-		writeError(w, r, 422, "validation_failed", "Выбор папки пока недоступен", map[string]string{"folderId": "Пока доступен только Inbox"})
-		return
+		parsed, err := uuid.Parse(q.Get("folderId"))
+		if err != nil {
+			writeError(w, r, 422, "validation_failed", "Проверьте параметры", map[string]string{"folderId": "Некорректная папка"})
+			return
+		}
+		folderID = &parsed
 	}
 	limit := 50
 	if raw := q.Get("limit"); raw != "" {
@@ -151,9 +169,13 @@ func (s *Server) listCards(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = n
 	}
-	items, next, err := s.cards.List(r.Context(), currentUserID(r), q.Get("cursor"), limit)
+	items, next, err := s.cards.List(r.Context(), currentUserID(r), folderID, q.Get("cursor"), limit)
 	if errors.Is(err, cards.ErrInvalidCursor) {
 		writeError(w, r, 400, "invalid_cursor", "Некорректный курсор", nil)
+		return
+	}
+	if errors.Is(err, cards.ErrFolderNotFound) {
+		writeError(w, r, 404, "folder_not_found", "Папка не найдена", nil)
 		return
 	}
 	if err != nil {
@@ -171,9 +193,17 @@ func (s *Server) createCard(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	card, fields, err := s.cards.Create(r.Context(), currentUserID(r), in.Front, in.Back)
+	folderID, ok := optionalUUID(w, r, in.FolderID, "folderId")
+	if !ok {
+		return
+	}
+	card, fields, err := s.cards.Create(r.Context(), currentUserID(r), folderID, in.Front, in.Back)
 	if fields != nil {
 		writeError(w, r, 422, "validation_failed", "Проверьте введённые данные", fields)
+		return
+	}
+	if errors.Is(err, cards.ErrFolderNotFound) {
+		writeError(w, r, 404, "folder_not_found", "Папка не найдена", nil)
 		return
 	}
 	if err != nil {
@@ -209,7 +239,11 @@ func (s *Server) updateCard(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	card, fields, err := s.cards.Update(r.Context(), currentUserID(r), id, in.Front, in.Back)
+	folderID, valid := optionalUUID(w, r, in.FolderID, "folderId")
+	if !valid {
+		return
+	}
+	card, fields, err := s.cards.Update(r.Context(), currentUserID(r), id, in.Front, in.Back, folderID)
 	if fields != nil {
 		writeError(w, r, 422, "validation_failed", "Проверьте введённые данные", fields)
 		return
@@ -218,11 +252,132 @@ func (s *Server) updateCard(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, 404, "card_not_found", "Карточка не найдена", nil)
 		return
 	}
+	if errors.Is(err, cards.ErrFolderNotFound) {
+		writeError(w, r, 404, "folder_not_found", "Папка не найдена", nil)
+		return
+	}
 	if err != nil {
 		s.internal(w, r, err)
 		return
 	}
 	writeJSON(w, 200, map[string]any{"card": card})
+}
+
+func optionalUUID(w http.ResponseWriter, r *http.Request, value *string, field string) (*uuid.UUID, bool) {
+	if value == nil {
+		return nil, true
+	}
+	id, err := uuid.Parse(*value)
+	if err != nil {
+		writeError(w, r, 422, "validation_failed", "Проверьте введённые данные", map[string]string{field: "Некорректный идентификатор"})
+		return nil, false
+	}
+	return &id, true
+}
+
+type createFolderInput struct {
+	ParentID string `json:"parentId"`
+	Name     string `json:"name"`
+}
+
+type updateFolderInput struct {
+	ParentID *string `json:"parentId"`
+	Name     *string `json:"name"`
+}
+
+func folderID(r *http.Request) (uuid.UUID, bool) {
+	id, err := uuid.Parse(chi.URLParam(r, "folderId"))
+	return id, err == nil
+}
+
+func (s *Server) folderTree(w http.ResponseWriter, r *http.Request) {
+	root, err := s.folders.Tree(r.Context(), currentUserID(r))
+	if err != nil {
+		s.internal(w, r, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"root": root})
+}
+
+func (s *Server) createFolder(w http.ResponseWriter, r *http.Request) {
+	var in createFolderInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	parentID, err := uuid.Parse(in.ParentID)
+	if err != nil {
+		writeError(w, r, 422, "validation_failed", "Проверьте введённые данные", map[string]string{"parentId": "Некорректный идентификатор"})
+		return
+	}
+	folder, fields, err := s.folders.Create(r.Context(), currentUserID(r), parentID, in.Name)
+	if fields != nil {
+		writeError(w, r, 422, "validation_failed", "Проверьте введённые данные", fields)
+		return
+	}
+	if s.writeFolderError(w, r, err) {
+		return
+	}
+	writeJSON(w, 201, map[string]any{"folder": folder})
+}
+
+func (s *Server) updateFolder(w http.ResponseWriter, r *http.Request) {
+	id, ok := folderID(r)
+	if !ok {
+		writeError(w, r, 404, "folder_not_found", "Папка не найдена", nil)
+		return
+	}
+	var in updateFolderInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	parentID, valid := optionalUUID(w, r, in.ParentID, "parentId")
+	if !valid {
+		return
+	}
+	folder, fields, err := s.folders.Update(r.Context(), currentUserID(r), id, in.Name, parentID)
+	if fields != nil {
+		writeError(w, r, 422, "validation_failed", "Проверьте введённые данные", fields)
+		return
+	}
+	if s.writeFolderError(w, r, err) {
+		return
+	}
+	writeJSON(w, 200, map[string]any{"folder": folder})
+}
+
+func (s *Server) deleteFolder(w http.ResponseWriter, r *http.Request) {
+	id, ok := folderID(r)
+	if !ok {
+		writeError(w, r, 404, "folder_not_found", "Папка не найдена", nil)
+		return
+	}
+	if s.writeFolderError(w, r, s.folders.Delete(r.Context(), currentUserID(r), id)) {
+		return
+	}
+	w.WriteHeader(204)
+}
+
+func (s *Server) writeFolderError(w http.ResponseWriter, r *http.Request, err error) bool {
+	if err == nil {
+		return false
+	}
+	switch {
+	case errors.Is(err, folders.ErrNotFound):
+		writeError(w, r, 404, "folder_not_found", "Папка не найдена", nil)
+	case errors.Is(err, folders.ErrInboxImmutable):
+		writeError(w, r, 403, "inbox_immutable", "Inbox нельзя изменить", nil)
+	case errors.Is(err, folders.ErrNameTaken):
+		writeError(w, r, 409, "folder_name_taken", "Название уже используется", map[string]string{"name": "Название уже используется"})
+	case errors.Is(err, folders.ErrCycle):
+		writeError(w, r, 409, "folder_cycle", "Нельзя переместить папку в её поддерево", nil)
+	case errors.Is(err, folders.ErrDepthExceeded):
+		writeError(w, r, 422, "folder_depth_exceeded", "Максимальная глубина — 10 уровней", map[string]string{"parentId": "Максимальная глубина — 10 уровней"})
+	case errors.Is(err, folders.ErrNotEmpty):
+		writeError(w, r, 409, "folder_not_empty", "Сначала перенесите или удалите содержимое папки", nil)
+	default:
+		s.internal(w, r, err)
+	}
+	return true
 }
 func (s *Server) deleteCard(w http.ResponseWriter, r *http.Request) {
 	id, ok := cardID(r)

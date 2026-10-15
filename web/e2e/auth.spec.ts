@@ -80,3 +80,49 @@ test("focus fallback notices a logout when BroadcastChannel is unavailable", asy
   await otherPage.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(otherPage).toHaveURL(/\/login$/);
 });
+
+test("manages nested folders and moves a card", async ({ page }) => {
+  const login = `User${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`;
+  await page.goto("/register");
+  await page.getByLabel("Логин").fill(login);
+  await page.getByLabel("Пароль").fill("exact password");
+  await page.getByRole("button", { name: "Создать аккаунт" }).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByRole("heading", { name: "Карточки" })).toBeVisible();
+  const toggle = page.getByRole("button", { name: "Показать папки" });
+  if (await toggle.isVisible()) await toggle.click();
+
+  await page.getByRole("button", { name: "Создать внутри" }).click();
+  await page.getByLabel("Название").fill("Topic");
+  await page.getByRole("button", { name: "Сохранить" }).click();
+  await expect(page).toHaveURL(/folderId=/);
+  await page.getByRole("button", { name: "Создать внутри" }).click();
+  await page.getByLabel("Название").fill("Child");
+  await page.getByRole("button", { name: "Сохранить" }).click();
+
+  await page.getByRole("link", { name: "Добавить карточку" }).first().click();
+  await expect(page.getByLabel("Папка")).toHaveValue(/.+/);
+  await page.getByLabel("Лицевая сторона").fill("folder front");
+  await page.getByLabel("Обратная сторона").fill("folder back");
+  await page.getByRole("button", { name: "Сохранить" }).click();
+  await page.getByRole("link", { name: "Открыть карточку" }).click();
+  await page.getByRole("button", { name: "Редактировать" }).click();
+  await page.getByLabel("Папка").selectOption({ label: "Inbox" });
+  await page.getByRole("button", { name: "Сохранить" }).click();
+  await page.goto("/app");
+  if (await toggle.isVisible()) await toggle.click();
+  await page.getByRole("button", { name: /Child/ }).click();
+  if (await toggle.isVisible()) await toggle.click();
+  await page.getByRole("button", { name: "Удалить" }).click();
+  await page.getByRole("button", { name: "Удалить папку" }).click();
+  await expect(page.getByRole("button", { name: /Child/ })).toHaveCount(0);
+  await page.getByRole("button", { name: /Topic/ }).click();
+  if (await toggle.isVisible()) await toggle.click();
+  await page.getByRole("button", { name: "Удалить" }).click();
+  await page.getByRole("button", { name: "Удалить папку" }).click();
+  await expect(page.getByRole("button", { name: /Topic/ })).toHaveCount(0);
+  await expect(page.locator("body")).toHaveJSProperty(
+    "scrollWidth",
+    await page.locator("body").evaluate((el) => el.clientWidth),
+  );
+});

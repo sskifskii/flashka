@@ -18,7 +18,8 @@ body {
 }
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 .brand {
@@ -85,6 +86,7 @@ textarea {
 }
 input:focus,
 textarea:focus,
+select:focus,
 button:focus-visible,
 a:focus-visible {
   outline: 3px solid #9fb2ff;
@@ -93,6 +95,94 @@ a:focus-visible {
 input[aria-invalid="true"],
 textarea[aria-invalid="true"] {
   border-color: #b52c42;
+}
+.collection {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.collection-cards {
+  min-width: 0;
+}
+.folder-panel {
+  background: #fff;
+  border: 1px solid #dfe4f0;
+  border-radius: 16px;
+  padding: 18px;
+}
+.folder-panel-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.folder-panel-title span {
+  color: #66708a;
+  font-size: 0.72rem;
+}
+.folder-tree,
+.folder-tree ul {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+.folder-tree ul {
+  padding-left: 14px;
+  border-left: 1px solid #dfe4f0;
+}
+.folder-node {
+  width: 100%;
+  min-height: 44px;
+  margin: 2px 0;
+  padding: 8px 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  background: transparent;
+  color: #17213c;
+  font-weight: 600;
+}
+.folder-node small {
+  color: #66708a;
+  white-space: nowrap;
+}
+.folder-node.selected {
+  background: #e8edff;
+  color: #264bc3;
+}
+.folder-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 18px;
+}
+.folder-actions button {
+  min-height: 44px;
+  padding: 8px;
+  margin: 0;
+  font-size: 0.8rem;
+}
+.danger-outline {
+  background: transparent;
+  color: #a21d34;
+  border: 1px solid #d9a6af;
+}
+.folder-form {
+  border-top: 1px solid #e2e6ef;
+  margin-top: 18px;
+  padding-top: 18px;
+}
+.folder-form p {
+  color: #66708a;
+  line-height: 1.4;
+}
+.folder-toggle {
+  display: none;
+}
+.folder-loading {
+  color: #66708a;
 }
 .field-error,
 .form-error {
@@ -377,6 +467,22 @@ button:disabled {
     max-width: 80px;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: block;
+  }
+}
+@media (max-width: 767px) {
+  .collection {
+    display: block;
+  }
+  .folder-toggle {
+    display: inline-flex;
+    margin: 0 0 16px;
+  }
+  .folder-drawer {
+    display: none;
+    margin-bottom: 24px;
+  }
+  .folder-drawer.open {
     display: block;
   }
 }

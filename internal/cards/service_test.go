@@ -8,7 +8,7 @@ import (
 )
 
 func TestUpdateRequiresAtLeastOneSide(t *testing.T) {
-	_, fields, err := (Service{}).Update(context.Background(), uuid.New(), uuid.New(), nil, nil)
+	_, fields, err := (Service{}).Update(context.Background(), uuid.New(), uuid.New(), nil, nil, nil)
 	if err != nil || fields["request"] == "" {
 		t.Fatalf("fields=%#v err=%v", fields, err)
 	}

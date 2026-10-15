@@ -38,7 +38,7 @@ func validate(front, back string) (string, string, FieldErrors) {
 	return front, back, nil
 }
 
-func (s Service) Create(ctx context.Context, userID uuid.UUID, front, back string) (Card, FieldErrors, error) {
+func (s Service) Create(ctx context.Context, userID uuid.UUID, folderID *uuid.UUID, front, back string) (Card, FieldErrors, error) {
 	front, back, fields := validate(front, back)
 	if fields != nil {
 		return Card{}, fields, nil
@@ -47,14 +47,18 @@ func (s Service) Create(ctx context.Context, userID uuid.UUID, front, back strin
 	if err != nil {
 		return Card{}, nil, err
 	}
-	c, err := s.Repo.Create(ctx, id, userID, front, back, s.Clock.Now().UTC())
+	folder, err := s.Repo.ResolveFolder(ctx, userID, folderID)
+	if err != nil {
+		return Card{}, nil, err
+	}
+	c, err := s.Repo.Create(ctx, id, userID, folder, front, back, s.Clock.Now().UTC())
 	return c, nil, err
 }
 func (s Service) Get(ctx context.Context, userID, cardID uuid.UUID) (Card, error) {
 	return s.Repo.Get(ctx, userID, cardID)
 }
-func (s Service) Update(ctx context.Context, userID, cardID uuid.UUID, front, back *string) (Card, FieldErrors, error) {
-	if front == nil && back == nil {
+func (s Service) Update(ctx context.Context, userID, cardID uuid.UUID, front, back *string, folderID *uuid.UUID) (Card, FieldErrors, error) {
+	if front == nil && back == nil && folderID == nil {
 		return Card{}, FieldErrors{"request": "Укажите хотя бы одно поле"}, nil
 	}
 	current, err := s.Repo.Get(ctx, userID, cardID)
@@ -62,28 +66,39 @@ func (s Service) Update(ctx context.Context, userID, cardID uuid.UUID, front, ba
 		return Card{}, nil, err
 	}
 	f, b := current.Front, current.Back
+	folder := current.FolderID
 	if front != nil {
 		f = *front
 	}
 	if back != nil {
 		b = *back
 	}
+	if folderID != nil {
+		folder, err = s.Repo.ResolveFolder(ctx, userID, folderID)
+		if err != nil {
+			return Card{}, nil, err
+		}
+	}
 	f, b, fields := validate(f, b)
 	if fields != nil {
 		return Card{}, fields, nil
 	}
-	c, err := s.Repo.Update(ctx, userID, cardID, f, b, s.Clock.Now().UTC())
+	c, err := s.Repo.Update(ctx, userID, cardID, folder, f, b, s.Clock.Now().UTC())
 	return c, nil, err
 }
 func (s Service) Delete(ctx context.Context, userID, cardID uuid.UUID) error {
 	return s.Repo.Delete(ctx, userID, cardID)
 }
-func (s Service) List(ctx context.Context, userID uuid.UUID, cursor string, limit int) ([]Summary, string, error) {
+func (s Service) List(ctx context.Context, userID uuid.UUID, folderID *uuid.UUID, cursor string, limit int) ([]Summary, string, error) {
 	c, err := DecodeCursor(cursor, userID)
 	if err != nil {
 		return nil, "", err
 	}
-	items, err := s.Repo.List(ctx, userID, c, limit+1)
+	folder, err := s.Repo.ResolveFolder(ctx, userID, folderID)
+	if err != nil {
+		return nil, "", err
+	}
+	items, err := s.Repo.List(ctx, userID, folder, c, limit+1)
 	if err != nil {
 		return nil, "", err
 	}

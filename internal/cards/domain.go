@@ -15,6 +15,7 @@ import (
 
 var ErrNotFound = errors.New("card not found")
 var ErrInvalidCursor = errors.New("invalid cursor")
+var ErrFolderNotFound = errors.New("folder not found")
 
 type FieldErrors map[string]string
 

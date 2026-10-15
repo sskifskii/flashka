@@ -38,12 +38,40 @@ describe("cards UI", () => {
       }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
+  const treeResponse = () =>
+    new Response(
+      JSON.stringify({
+        root: {
+          id: "00000000-0000-4000-8000-000000000002",
+          parentId: null,
+          name: "Inbox",
+          isInbox: true,
+          directCardCount: 0,
+          totalCardCount: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          children: [],
+        },
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  const withTree = (
+    handler: (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => Promise<Response>,
+  ) =>
+    vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+      String(input).endsWith("/folders/tree")
+        ? Promise.resolve(treeResponse())
+        : handler(input, init),
+    );
 
   it("moves from the list skeleton to the empty state", async () => {
     let finish!: (response: Response) => void;
     vi.stubGlobal(
       "fetch",
-      vi.fn(
+      withTree(
         () =>
           new Promise<Response>((resolve) => {
             finish = resolve;
@@ -64,7 +92,7 @@ describe("cards UI", () => {
   });
 
   it("retries an initial list error and shows the successful result", async () => {
-    const fetchMock = vi
+    const cardsMock = vi
       .fn()
       .mockRejectedValueOnce(new TypeError("offline"))
       .mockResolvedValueOnce(
@@ -73,7 +101,7 @@ describe("cards UI", () => {
           null,
         ),
       );
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withTree(cardsMock));
     render(
       <MemoryRouter>
         <CardList />
@@ -85,18 +113,18 @@ describe("cards UI", () => {
     await userEvent.click(screen.getByRole("button", { name: "Повторить" }));
     expect(await screen.findByText("first")).toBeVisible();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(cardsMock).toHaveBeenCalledTimes(2);
   });
 
   it("keeps page one when page two fails and retries the same cursor", async () => {
     const first = summary("00000000-0000-4000-8000-000000000001", "first");
     const second = summary("00000000-0000-4000-8000-000000000002", "second");
-    const fetchMock = vi
+    const cardsMock = vi
       .fn()
       .mockResolvedValueOnce(listResponse([first], "page-two"))
       .mockRejectedValueOnce(new TypeError("offline"))
       .mockResolvedValueOnce(listResponse([second], null));
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withTree(cardsMock));
     render(
       <MemoryRouter>
         <CardList />
@@ -113,7 +141,7 @@ describe("cards UI", () => {
     await userEvent.click(screen.getByRole("button", { name: "Повторить" }));
     expect(await screen.findByText("second")).toBeVisible();
     expect(screen.getByText("first")).toBeVisible();
-    expect(fetchMock).toHaveBeenNthCalledWith(
+    expect(cardsMock).toHaveBeenNthCalledWith(
       3,
       "/api/v1/cards?cursor=page-two",
       expect.anything(),
@@ -123,16 +151,18 @@ describe("cards UI", () => {
   it("shows a tenant-safe detail not-found state", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            error: {
-              code: "card_not_found",
-              message: "Карточка не найдена",
-              requestId: crypto.randomUUID(),
-            },
-          }),
-          { status: 404, headers: { "Content-Type": "application/json" } },
+      withTree(
+        vi.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              error: {
+                code: "card_not_found",
+                message: "Карточка не найдена",
+                requestId: crypto.randomUUID(),
+              },
+            }),
+            { status: 404, headers: { "Content-Type": "application/json" } },
+          ),
         ),
       ),
     );
@@ -152,11 +182,11 @@ describe("cards UI", () => {
   });
 
   it("retries an initial detail network error", async () => {
-    const fetchMock = vi
+    const cardsMock = vi
       .fn()
       .mockRejectedValueOnce(new TypeError("offline"))
       .mockResolvedValueOnce(cardResponse());
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withTree(cardsMock));
     render(
       <MemoryRouter
         initialEntries={["/app/cards/00000000-0000-4000-8000-000000000001"]}
@@ -171,11 +201,14 @@ describe("cards UI", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "Повторить" }));
     expect(await screen.findByText("front", { exact: true })).toBeVisible();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(cardsMock).toHaveBeenCalledTimes(2);
   });
 
   it("validates both sides and preserves input after a network error", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
+    vi.stubGlobal(
+      "fetch",
+      withTree(vi.fn().mockRejectedValue(new TypeError("offline"))),
+    );
     render(
       <MemoryRouter>
         <NewCard />
@@ -194,7 +227,7 @@ describe("cards UI", () => {
   });
 
   it("renders text safely and requires explicit delete confirmation", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
+    const cardsMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
           card: {
@@ -215,7 +248,7 @@ describe("cards UI", () => {
         { status: 200, headers: { "Content-Type": "application/json" } },
       ),
     );
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", withTree(cardsMock));
     render(
       <MemoryRouter
         initialEntries={["/app/cards/00000000-0000-4000-8000-000000000001"]}
@@ -231,6 +264,6 @@ describe("cards UI", () => {
     expect(screen.getByRole("dialog")).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Отмена" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(cardsMock).toHaveBeenCalledOnce();
   });
 });

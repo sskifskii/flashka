@@ -43,6 +43,26 @@ function userResponse() {
   );
 }
 
+function folderTreeResponse() {
+  const now = new Date().toISOString();
+  return new Response(
+    JSON.stringify({
+      root: {
+        id: crypto.randomUUID(),
+        parentId: null,
+        name: "Inbox",
+        isInbox: true,
+        directCardCount: 0,
+        totalCardCount: 0,
+        createdAt: now,
+        updatedAt: now,
+        children: [],
+      },
+    }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  );
+}
+
 describe("authentication routes", () => {
   it("shows the recovery warning and inline client validation", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(errorResponse(401)));
@@ -129,6 +149,8 @@ describe("authentication routes", () => {
             headers: { "Content-Type": "application/json" },
           }),
         );
+      if (String(input).endsWith("/folders/tree"))
+        return Promise.resolve(folderTreeResponse());
       if (String(input).endsWith("/auth/logout") && init?.method === "POST")
         return logoutResponse;
       throw new Error(`unexpected request ${String(input)}`);
@@ -151,7 +173,7 @@ describe("authentication routes", () => {
       await screen.findByRole("button", { name: "Выходим…" }),
     ).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: "Выходим…" }));
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(screen.getByRole("heading", { name: "Карточки" })).toBeVisible();
     expect(postMessage).not.toHaveBeenCalled();
     finishLogout(errorResponse(500));
@@ -159,7 +181,7 @@ describe("authentication routes", () => {
     expect(await screen.findByText(/Не удалось выйти/)).toBeVisible();
     expect(screen.getByRole("heading", { name: "Карточки" })).toBeVisible();
     expect(postMessage).not.toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("broadcasts and navigates only after logout returns 204", async () => {
@@ -177,6 +199,8 @@ describe("authentication routes", () => {
             headers: { "Content-Type": "application/json" },
           }),
         );
+      if (String(input).endsWith("/folders/tree"))
+        return Promise.resolve(folderTreeResponse());
       if (String(input).endsWith("/auth/logout") && init?.method === "POST")
         return logoutResponse;
       throw new Error(`unexpected request ${String(input)}`);

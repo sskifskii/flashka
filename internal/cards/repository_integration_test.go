@@ -51,35 +51,35 @@ func seedUser(t *testing.T, pool *pgxpool.Pool, login string) (uuid.UUID, uuid.U
 func TestRepositoryCRUDPaginationAndTenantIsolation(t *testing.T) {
 	pool := cardsPool(t)
 	repo := Repository{Pool: pool}
-	u1, _ := seedUser(t, pool, "ownerone")
+	u1, f1 := seedUser(t, pool, "ownerone")
 	u2, _ := seedUser(t, pool, "ownertwo")
 	base := time.Now().UTC().Truncate(time.Microsecond)
 	cards := make([]Card, 3)
 	for i := range cards {
 		var err error
-		cards[i], err = repo.Create(context.Background(), uuid.New(), u1, "front", "back", base.Add(time.Duration(i)*time.Second))
+		cards[i], err = repo.Create(context.Background(), uuid.New(), u1, f1, "front", "back", base.Add(time.Duration(i)*time.Second))
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	first, err := repo.List(context.Background(), u1, nil, 2)
+	first, err := repo.List(context.Background(), u1, f1, nil, 2)
 	if err != nil || len(first) != 2 || first[0].ID != cards[2].ID || first[1].ID != cards[1].ID {
 		t.Fatalf("page=%#v err=%v", first, err)
 	}
-	second, err := repo.List(context.Background(), u1, &Cursor{CreatedAt: first[1].CreatedAt, ID: first[1].ID}, 2)
+	second, err := repo.List(context.Background(), u1, f1, &Cursor{CreatedAt: first[1].CreatedAt, ID: first[1].ID}, 2)
 	if err != nil || len(second) != 1 || second[0].ID != cards[0].ID {
 		t.Fatalf("second=%#v err=%v", second, err)
 	}
 	if _, err = repo.Get(context.Background(), u2, cards[0].ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("cross tenant get=%v", err)
 	}
-	if _, err = repo.Update(context.Background(), u2, cards[0].ID, "x", "y", base); !errors.Is(err, ErrNotFound) {
+	if _, err = repo.Update(context.Background(), u2, cards[0].ID, f1, "x", "y", base); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("cross tenant update=%v", err)
 	}
 	if err = repo.Delete(context.Background(), u2, cards[0].ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("cross tenant delete=%v", err)
 	}
-	updated, err := repo.Update(context.Background(), u1, cards[0].ID, "new front", "new back", base.Add(time.Hour))
+	updated, err := repo.Update(context.Background(), u1, cards[0].ID, f1, "new front", "new back", base.Add(time.Hour))
 	if err != nil || updated.CreatedAt != cards[0].CreatedAt || updated.CorrectCount != 0 {
 		t.Fatalf("updated=%#v err=%v", updated, err)
 	}

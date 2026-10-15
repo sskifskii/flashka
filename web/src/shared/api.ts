@@ -15,6 +15,20 @@ export type Card = CardSummary & {
   lastReviewedAt: string | null;
   dueAt: string | null;
 };
+export type Folder = {
+  id: string;
+  parentId: string;
+  name: string;
+  isInbox: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type FolderNode = Omit<Folder, "parentId"> & {
+  parentId: string | null;
+  directCardCount: number;
+  totalCardCount: number;
+  children: FolderNode[];
+};
 export type APIError = {
   error: {
     code: string;
@@ -85,22 +99,44 @@ export const api = {
       body: JSON.stringify(value),
     }),
   logout: () => request<void>("/auth/logout", { method: "POST" }, 204),
-  listCards: (cursor?: string) =>
-    request<{ items: CardSummary[]; nextCursor: string | null }>(
-      `/cards${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
-    ),
-  createCard: (value: { front: string; back: string }) =>
+  listCards: (cursor?: string, folderId?: string) => {
+    const params = new URLSearchParams();
+    if (cursor) params.set("cursor", cursor);
+    if (folderId) params.set("folderId", folderId);
+    const query = params.toString();
+    return request<{ items: CardSummary[]; nextCursor: string | null }>(
+      `/cards${query ? `?${query}` : ""}`,
+    );
+  },
+  createCard: (value: { front: string; back: string; folderId?: string }) =>
     request<{ card: Card }>(
       "/cards",
       { method: "POST", body: JSON.stringify(value) },
       201,
     ),
   getCard: (id: string) => request<{ card: Card }>(`/cards/${id}`),
-  updateCard: (id: string, value: { front: string; back: string }) =>
+  updateCard: (
+    id: string,
+    value: { front: string; back: string; folderId?: string },
+  ) =>
     request<{ card: Card }>(`/cards/${id}`, {
       method: "PATCH",
       body: JSON.stringify(value),
     }),
   deleteCard: (id: string) =>
     request<void>(`/cards/${id}`, { method: "DELETE" }, 204),
+  folderTree: () => request<{ root: FolderNode }>("/folders/tree"),
+  createFolder: (value: { parentId: string; name: string }) =>
+    request<{ folder: Folder }>(
+      "/folders",
+      { method: "POST", body: JSON.stringify(value) },
+      201,
+    ),
+  updateFolder: (id: string, value: { name?: string; parentId?: string }) =>
+    request<{ folder: Folder }>(`/folders/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(value),
+    }),
+  deleteFolder: (id: string) =>
+    request<void>(`/folders/${id}`, { method: "DELETE" }, 204),
 };

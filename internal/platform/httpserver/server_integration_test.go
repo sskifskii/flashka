@@ -150,11 +150,65 @@ func TestAuthHTTPContract(t *testing.T) {
 	if status, body, _ = request("POST", "/api/v1/cards", map[string]string{"front": "a", "back": "b", "extra": "no"}); status != 400 || errorCode(body) != "invalid_request" {
 		t.Fatalf("strict=%d %#v", status, body)
 	}
-	if status, body, _ = request("GET", "/api/v1/cards?folderId="+uuid.NewString(), nil); status != 422 {
-		t.Fatalf("folder=%d %#v", status, body)
+	if status, body, _ = request("GET", "/api/v1/cards?folderId=broken", nil); status != 422 {
+		t.Fatalf("invalid folder=%d %#v", status, body)
+	}
+	if status, body, _ = request("GET", "/api/v1/cards?folderId="+uuid.NewString(), nil); status != 404 || errorCode(body) != "folder_not_found" {
+		t.Fatalf("missing folder=%d %#v", status, body)
 	}
 	if status, body, _ = request("GET", "/api/v1/cards?cursor=broken", nil); status != 400 || errorCode(body) != "invalid_cursor" {
 		t.Fatalf("cursor=%d %#v", status, body)
+	}
+	status, body, _ = request("GET", "/api/v1/folders/tree", nil)
+	if status != 200 {
+		t.Fatalf("tree=%d %#v", status, body)
+	}
+	root, _ := body["root"].(map[string]any)
+	inboxID, _ := root["id"].(string)
+	if inboxID == "" || root["name"] != "Inbox" {
+		t.Fatalf("root=%#v", root)
+	}
+	status, body, _ = request("POST", "/api/v1/folders", map[string]string{"parentId": inboxID, "name": " Topic "})
+	if status != 201 {
+		t.Fatalf("create folder=%d %#v", status, body)
+	}
+	topic, _ := body["folder"].(map[string]any)
+	topicID, _ := topic["id"].(string)
+	status, body, _ = request("POST", "/api/v1/folders", map[string]string{"parentId": topicID, "name": "Child"})
+	if status != 201 {
+		t.Fatalf("create child=%d %#v", status, body)
+	}
+	child, _ := body["folder"].(map[string]any)
+	childID, _ := child["id"].(string)
+	if status, body, _ = request("POST", "/api/v1/folders", map[string]string{"parentId": inboxID, "name": "topic"}); status != 409 || errorCode(body) != "folder_name_taken" {
+		t.Fatalf("duplicate folder=%d %#v", status, body)
+	}
+	if status, body, _ = request("PATCH", "/api/v1/folders/"+inboxID, map[string]string{"name": "Renamed"}); status != 403 || errorCode(body) != "inbox_immutable" {
+		t.Fatalf("inbox mutation=%d %#v", status, body)
+	}
+	if status, body, _ = request("PATCH", "/api/v1/folders/"+topicID, map[string]string{"parentId": childID}); status != 409 || errorCode(body) != "folder_cycle" {
+		t.Fatalf("folder cycle=%d %#v", status, body)
+	}
+	status, body, _ = request("POST", "/api/v1/cards", map[string]string{"front": "folder front", "back": "folder back", "folderId": childID})
+	if status != 201 {
+		t.Fatalf("folder card=%d %#v", status, body)
+	}
+	folderCard, _ := body["card"].(map[string]any)
+	folderCardID, _ := folderCard["id"].(string)
+	if status, body, _ = request("GET", "/api/v1/cards?folderId="+childID, nil); status != 200 || len(body["items"].([]any)) != 1 {
+		t.Fatalf("folder list=%d %#v", status, body)
+	}
+	if status, body, _ = request("DELETE", "/api/v1/folders/"+childID, nil); status != 409 || errorCode(body) != "folder_not_empty" {
+		t.Fatalf("nonempty folder=%d %#v", status, body)
+	}
+	if status, body, _ = request("PATCH", "/api/v1/cards/"+folderCardID, map[string]string{"folderId": inboxID}); status != 200 {
+		t.Fatalf("move card=%d %#v", status, body)
+	}
+	if status, _, _ = request("DELETE", "/api/v1/folders/"+childID, nil); status != 204 {
+		t.Fatalf("delete child=%d", status)
+	}
+	if status, _, _ = request("DELETE", "/api/v1/folders/"+topicID, nil); status != 204 {
+		t.Fatalf("delete topic=%d", status)
 	}
 	now := time.Now().UTC()
 	otherUser, otherFolder, otherCard := uuid.New(), uuid.New(), uuid.New()
@@ -166,6 +220,22 @@ func TestAuthHTTPContract(t *testing.T) {
 	}
 	if _, err = pool.Exec(context.Background(), `INSERT INTO cards(id,user_id,folder_id,front,back,created_at,updated_at) VALUES($1,$2,$3,'other front','other back',$4,$4)`, otherCard, otherUser, otherFolder, now); err != nil {
 		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		method string
+		path   string
+		body   any
+	}{
+		{"GET", "/api/v1/cards?folderId=" + otherFolder.String(), nil},
+		{"POST", "/api/v1/cards", map[string]string{"front": "foreign target", "back": "no", "folderId": otherFolder.String()}},
+		{"PATCH", "/api/v1/cards/" + cardID, map[string]string{"folderId": otherFolder.String()}},
+		{"POST", "/api/v1/folders", map[string]string{"parentId": otherFolder.String(), "name": "No"}},
+		{"PATCH", "/api/v1/folders/" + otherFolder.String(), map[string]string{"name": "No"}},
+		{"DELETE", "/api/v1/folders/" + otherFolder.String(), nil},
+	} {
+		if status, body, _ = request(test.method, test.path, test.body); status != 404 || errorCode(body) != "folder_not_found" {
+			t.Fatalf("foreign folder %s %s=%d %#v", test.method, test.path, status, body)
+		}
 	}
 	for _, method := range []string{"GET", "PATCH", "DELETE"} {
 		var payload any
@@ -203,7 +273,7 @@ func TestAuthHTTPContract(t *testing.T) {
 		}
 	}
 	logText := logs.String()
-	for _, secret := range []string{"exact password", "wrong password", passwordHash, rawToken, "\"password\"", "flashka_session=", "private front", "private\\nback", "changed front", "other front", "other back"} {
+	for _, secret := range []string{"exact password", "wrong password", passwordHash, rawToken, "\"password\"", "flashka_session=", "private front", "private\\nback", "changed front", "folder front", "folder back", "foreign target", "other front", "other back"} {
 		if secret != "" && strings.Contains(logText, secret) {
 			t.Fatalf("secret leaked in logs: %q", secret)
 		}

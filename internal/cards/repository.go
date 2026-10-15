@@ -23,18 +23,31 @@ func scanCard(row pgx.Row) (Card, error) {
 	return c, err
 }
 
-func (r Repository) Create(ctx context.Context, id, userID uuid.UUID, front, back string, now time.Time) (Card, error) {
+func (r Repository) ResolveFolder(ctx context.Context, userID uuid.UUID, requested *uuid.UUID) (uuid.UUID, error) {
+	var id uuid.UUID
+	var err error
+	if requested == nil {
+		err = r.Pool.QueryRow(ctx, `SELECT id FROM folders WHERE user_id=$1 AND is_inbox`, userID).Scan(&id)
+	} else {
+		err = r.Pool.QueryRow(ctx, `SELECT id FROM folders WHERE user_id=$1 AND id=$2`, userID, *requested).Scan(&id)
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, ErrFolderNotFound
+	}
+	return id, err
+}
+
+func (r Repository) Create(ctx context.Context, id, userID, folderID uuid.UUID, front, back string, now time.Time) (Card, error) {
 	return scanCard(r.Pool.QueryRow(ctx, `INSERT INTO cards(id,user_id,folder_id,front,back,created_at,updated_at)
-		SELECT $1,$2,id,$3,$4,$5,$5 FROM folders WHERE user_id=$2 AND is_inbox
-		RETURNING `+cardColumns, id, userID, front, back, now))
+		VALUES($1,$2,$3,$4,$5,$6,$6) RETURNING `+cardColumns, id, userID, folderID, front, back, now))
 }
 
 func (r Repository) Get(ctx context.Context, userID, cardID uuid.UUID) (Card, error) {
 	return scanCard(r.Pool.QueryRow(ctx, `SELECT `+cardColumns+` FROM cards WHERE user_id=$1 AND id=$2`, userID, cardID))
 }
 
-func (r Repository) Update(ctx context.Context, userID, cardID uuid.UUID, front, back string, now time.Time) (Card, error) {
-	return scanCard(r.Pool.QueryRow(ctx, `UPDATE cards SET front=$3,back=$4,updated_at=$5 WHERE user_id=$1 AND id=$2 RETURNING `+cardColumns, userID, cardID, front, back, now))
+func (r Repository) Update(ctx context.Context, userID, cardID, folderID uuid.UUID, front, back string, now time.Time) (Card, error) {
+	return scanCard(r.Pool.QueryRow(ctx, `UPDATE cards SET folder_id=$3,front=$4,back=$5,updated_at=$6 WHERE user_id=$1 AND id=$2 RETURNING `+cardColumns, userID, cardID, folderID, front, back, now))
 }
 
 func (r Repository) Delete(ctx context.Context, userID, cardID uuid.UUID) error {
@@ -45,13 +58,13 @@ func (r Repository) Delete(ctx context.Context, userID, cardID uuid.UUID) error 
 	return err
 }
 
-func (r Repository) List(ctx context.Context, userID uuid.UUID, cursor *Cursor, limit int) ([]Summary, error) {
+func (r Repository) List(ctx context.Context, userID, folderID uuid.UUID, cursor *Cursor, limit int) ([]Summary, error) {
 	var rows pgx.Rows
 	var err error
 	if cursor == nil {
-		rows, err = r.Pool.Query(ctx, `SELECT c.id,c.front,c.back,c.created_at,c.updated_at FROM cards c JOIN folders f ON f.user_id=c.user_id AND f.id=c.folder_id WHERE c.user_id=$1 AND f.is_inbox ORDER BY c.created_at DESC,c.id DESC LIMIT $2`, userID, limit)
+		rows, err = r.Pool.Query(ctx, `SELECT id,front,back,created_at,updated_at FROM cards WHERE user_id=$1 AND folder_id=$2 ORDER BY created_at DESC,id DESC LIMIT $3`, userID, folderID, limit)
 	} else {
-		rows, err = r.Pool.Query(ctx, `SELECT c.id,c.front,c.back,c.created_at,c.updated_at FROM cards c JOIN folders f ON f.user_id=c.user_id AND f.id=c.folder_id WHERE c.user_id=$1 AND f.is_inbox AND (c.created_at,c.id)<($2,$3) ORDER BY c.created_at DESC,c.id DESC LIMIT $4`, userID, cursor.CreatedAt, cursor.ID, limit)
+		rows, err = r.Pool.Query(ctx, `SELECT id,front,back,created_at,updated_at FROM cards WHERE user_id=$1 AND folder_id=$2 AND (created_at,id)<($3,$4) ORDER BY created_at DESC,id DESC LIMIT $5`, userID, folderID, cursor.CreatedAt, cursor.ID, limit)
 	}
 	if err != nil {
 		return nil, err
