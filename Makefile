@@ -1,9 +1,16 @@
 DATABASE_URL ?= postgres://flashka:flashka@localhost:5432/flashka?sslmode=disable
 export DATABASE_URL
 
-.PHONY: dev db-up db-down migrate-up migrate-down migrate-check fmt fmt-check lint test test-integration test-e2e build openapi-check secret-check check
-dev: db-up migrate-up
+.PHONY: dev web-build db-up db-down migrate-up migrate-down migrate-check fmt fmt-check lint test test-integration test-e2e build openapi-check secret-check check
+dev: db-up
+	$(MAKE) migrate-up
+	$(MAKE) web-build
 	go run ./cmd/server
+web/node_modules/.flashka-install: web/package.json web/package-lock.json
+	cd web && npm ci
+	touch $@
+web-build: web/node_modules/.flashka-install
+	cd web && npm run build
 db-up:
 	docker compose up -d --wait postgres
 db-down:

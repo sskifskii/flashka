@@ -123,6 +123,7 @@ ADR хранит историческое обоснование решения 
 
 ## Проверенные команды проекта
 
+- `make dev` — однокомандный локальный запуск PostgreSQL, миграций, frontend и backend;
 - `make fmt-check` — проверка форматирования Go и frontend;
 - `make lint` — `go vet`, ESLint и TypeScript typecheck;
 - `make test` — Go race/unit и frontend component tests;

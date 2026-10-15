@@ -34,14 +34,17 @@ Redis, отдельный кэш, email, восстановление парол
 ## Локальный запуск
 
 Нужны Go 1.24+, Node.js 24+, npm и Docker. Значения из `.env.example` можно
-экспортировать для переопределения defaults. Для стандартного локального запуска:
+экспортировать для переопределения defaults. Для стандартного локального запуска
+из корня репозитория достаточно одной команды:
 
 ```sh
-cd web && npm ci && npm run build && cd ..
 make dev
 ```
 
-Приложение доступно на `http://localhost:8080`. `make check` запускает локальные
+Команда поднимает PostgreSQL, применяет миграции, устанавливает frontend-зависимости
+при первом запуске или изменении lock-файла, собирает frontend и запускает Go-сервер.
+Приложение доступно на `http://localhost:8080`; остановить сервер можно через
+`Ctrl+C`, а PostgreSQL — командой `make db-down`. `make check` запускает локальные
 quality gates, `make test-integration` — PostgreSQL integration tests,
 `make test-e2e` — браузерный сценарий после установки Playwright Chromium.
 
