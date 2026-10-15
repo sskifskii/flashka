@@ -84,6 +84,13 @@ func New(cfg config.Config, pool *pgxpool.Pool, service auth.Service, log *slog.
 			r.Use(s.authenticated)
 			r.Get("/preview", s.studyPreview)
 			r.With(s.csrf).Post("/sessions", s.createStudySession)
+			r.Get("/sessions/active", s.activeStudySession)
+			r.Route("/sessions/{sessionId}", func(r chi.Router) {
+				r.Get("/", s.getStudySession)
+				r.With(s.csrf).Post("/cards/{position}/reveal", s.revealStudyPosition)
+				r.With(s.csrf).Put("/cards/{position}/answer", s.answerStudyPosition)
+				r.With(s.csrf).Post("/abandon", s.abandonStudySession)
+			})
 		})
 	})
 	r.Handle("/*", s.frontend())
@@ -158,6 +165,126 @@ func (s *Server) createStudySession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 201, map[string]any{"session": session})
+}
+
+func studySessionID(r *http.Request) (uuid.UUID, bool) {
+	id, err := uuid.Parse(chi.URLParam(r, "sessionId"))
+	return id, err == nil
+}
+
+func studyPosition(r *http.Request) (int, bool) {
+	position, err := strconv.Atoi(chi.URLParam(r, "position"))
+	return position, err == nil && position > 0
+}
+
+func (s *Server) activeStudySession(w http.ResponseWriter, r *http.Request) {
+	state, err := s.study.Active(r.Context(), currentUserID(r))
+	if errors.Is(err, study.ErrNoActiveSession) {
+		w.WriteHeader(204)
+		return
+	}
+	if err != nil {
+		s.internal(w, r, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"session": state})
+}
+
+func (s *Server) getStudySession(w http.ResponseWriter, r *http.Request) {
+	id, ok := studySessionID(r)
+	if !ok {
+		writeError(w, r, 404, "study_session_not_found", "Сессия не найдена", nil)
+		return
+	}
+	state, err := s.study.Get(r.Context(), currentUserID(r), id)
+	if s.writeStudyRunError(w, r, err) {
+		return
+	}
+	writeJSON(w, 200, map[string]any{"session": state})
+}
+
+func (s *Server) revealStudyPosition(w http.ResponseWriter, r *http.Request) {
+	id, ok := studySessionID(r)
+	position, valid := studyPosition(r)
+	if !ok || !valid {
+		writeError(w, r, 404, "study_session_not_found", "Сессия или позиция не найдена", nil)
+		return
+	}
+	state, err := s.study.Reveal(r.Context(), currentUserID(r), id, position)
+	if s.writeStudyRunError(w, r, err) {
+		return
+	}
+	writeJSON(w, 200, map[string]any{"session": state})
+}
+
+type answerStudyPositionInput struct {
+	Rating    string `json:"rating"`
+	RequestID string `json:"requestId"`
+}
+
+func (s *Server) answerStudyPosition(w http.ResponseWriter, r *http.Request) {
+	id, ok := studySessionID(r)
+	position, valid := studyPosition(r)
+	if !ok || !valid {
+		writeError(w, r, 404, "study_session_not_found", "Сессия или позиция не найдена", nil)
+		return
+	}
+	var in answerStudyPositionInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	var requestFields study.FieldErrors
+	if in.RequestID == "" {
+		requestFields = study.FieldErrors{"requestId": "Укажите идентификатор запроса"}
+	} else if _, parseErr := uuid.Parse(in.RequestID); parseErr != nil {
+		requestFields = study.FieldErrors{"requestId": "Некорректный идентификатор запроса"}
+	}
+	if requestFields != nil {
+		writeError(w, r, 422, "validation_failed", "Проверьте параметры", requestFields)
+		return
+	}
+	state, fields, err := s.study.Answer(r.Context(), currentUserID(r), id, position, in.Rating)
+	if fields != nil {
+		writeError(w, r, 422, "validation_failed", "Проверьте параметры", fields)
+		return
+	}
+	if s.writeStudyRunError(w, r, err) {
+		return
+	}
+	writeJSON(w, 200, map[string]any{"session": state})
+}
+
+func (s *Server) abandonStudySession(w http.ResponseWriter, r *http.Request) {
+	id, ok := studySessionID(r)
+	if !ok {
+		writeError(w, r, 404, "study_session_not_found", "Сессия не найдена", nil)
+		return
+	}
+	if s.writeStudyRunError(w, r, s.study.Abandon(r.Context(), currentUserID(r), id)) {
+		return
+	}
+	w.WriteHeader(204)
+}
+
+func (s *Server) writeStudyRunError(w http.ResponseWriter, r *http.Request, err error) bool {
+	if err == nil {
+		return false
+	}
+	switch {
+	case errors.Is(err, study.ErrSessionNotFound):
+		writeError(w, r, 404, "study_session_not_found", "Сессия не найдена", nil)
+	case errors.Is(err, study.ErrNotRevealed):
+		writeError(w, r, 409, "study_position_not_revealed", "Сначала покажите ответ", nil)
+	case errors.Is(err, study.ErrAnswerConflict):
+		writeError(w, r, 409, "study_answer_conflict", "Для карточки уже сохранён другой ответ", nil)
+	case errors.Is(err, study.ErrPositionConflict):
+		writeError(w, r, 409, "study_position_conflict", "Позиция больше не является текущей", nil)
+	case errors.Is(err, study.ErrSessionInactive):
+		writeError(w, r, 409, "study_session_inactive", "Сессия уже завершена", nil)
+	default:
+		s.internal(w, r, err)
+	}
+	return true
 }
 
 func (s *Server) authenticated(next http.Handler) http.Handler {

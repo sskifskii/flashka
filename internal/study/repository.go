@@ -12,6 +12,10 @@ import (
 
 type Repository struct{ Pool *pgxpool.Pool }
 
+type rowQuerier interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
 func validateFolder(ctx context.Context, q interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }, userID uuid.UUID, scope Scope) error {
@@ -104,4 +108,223 @@ func (r Repository) Create(ctx context.Context, sessionID, userID uuid.UUID, sco
 		return Session{}, err
 	}
 	return Session{ID: sessionID, ScopeType: scope.Type, ScopeFolderID: scope.FolderID, RequestedCount: count, ActualCount: len(items), Status: "active", CreatedAt: now, First: Position{Position: 1, CardID: items[0].id, Front: items[0].front}}, nil
+}
+
+func readState(ctx context.Context, q rowQuerier, userID, sessionID uuid.UUID) (SessionState, error) {
+	var state SessionState
+	err := q.QueryRow(ctx, `SELECT id,actual_count,status,
+		(SELECT count(*)::int FROM study_session_cards WHERE session_id=study_sessions.id AND result IS NOT NULL)
+		FROM study_sessions WHERE user_id=$1 AND id=$2`, userID, sessionID).
+		Scan(&state.ID, &state.ActualCount, &state.Status, &state.AnsweredCount)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return SessionState{}, ErrSessionNotFound
+	}
+	if err != nil {
+		return SessionState{}, err
+	}
+	if state.Status != "active" {
+		return state, nil
+	}
+	var current CurrentPosition
+	err = q.QueryRow(ctx, `SELECT sc.position,c.id,c.front,
+		CASE WHEN sc.revealed_at IS NOT NULL THEN c.back END,
+		sc.revealed_at IS NOT NULL
+		FROM study_session_cards sc
+		JOIN cards c ON c.id=sc.card_id AND c.user_id=$1
+		WHERE sc.session_id=$2 AND sc.result IS NULL
+		ORDER BY sc.position LIMIT 1`, userID, sessionID).
+		Scan(&current.Position, &current.CardID, &current.Front, &current.Back, &current.Revealed)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return state, nil
+	}
+	if err != nil {
+		return SessionState{}, err
+	}
+	state.Current = &current
+	return state, nil
+}
+
+func (r Repository) Active(ctx context.Context, userID uuid.UUID) (SessionState, error) {
+	var sessionID uuid.UUID
+	err := r.Pool.QueryRow(ctx, `SELECT id FROM study_sessions
+		WHERE user_id=$1 AND status='active' ORDER BY created_at DESC LIMIT 1`, userID).Scan(&sessionID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return SessionState{}, ErrNoActiveSession
+	}
+	if err != nil {
+		return SessionState{}, err
+	}
+	return readState(ctx, r.Pool, userID, sessionID)
+}
+
+func (r Repository) Get(ctx context.Context, userID, sessionID uuid.UUID) (SessionState, error) {
+	return readState(ctx, r.Pool, userID, sessionID)
+}
+
+func lockSession(ctx context.Context, tx pgx.Tx, userID, sessionID uuid.UUID) (string, error) {
+	var status string
+	err := tx.QueryRow(ctx, `SELECT status FROM study_sessions WHERE user_id=$1 AND id=$2 FOR UPDATE`, userID, sessionID).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrSessionNotFound
+	}
+	return status, err
+}
+
+func currentPosition(ctx context.Context, q rowQuerier, sessionID uuid.UUID) (int, error) {
+	var position int
+	err := q.QueryRow(ctx, `SELECT position FROM study_session_cards
+		WHERE session_id=$1 AND result IS NULL ORDER BY position LIMIT 1`, sessionID).Scan(&position)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrPositionConflict
+	}
+	return position, err
+}
+
+func (r Repository) Reveal(ctx context.Context, userID, sessionID uuid.UUID, position int, now time.Time) (SessionState, error) {
+	tx, err := r.Pool.Begin(ctx)
+	if err != nil {
+		return SessionState{}, err
+	}
+	defer tx.Rollback(ctx)
+	status, err := lockSession(ctx, tx, userID, sessionID)
+	if err != nil {
+		return SessionState{}, err
+	}
+	if status != "active" {
+		return SessionState{}, ErrSessionInactive
+	}
+	current, err := currentPosition(ctx, tx, sessionID)
+	if err != nil {
+		return SessionState{}, err
+	}
+	if current != position {
+		return SessionState{}, ErrPositionConflict
+	}
+	tag, err := tx.Exec(ctx, `UPDATE study_session_cards SET revealed_at=COALESCE(revealed_at,$1)
+		WHERE session_id=$2 AND position=$3 AND result IS NULL`, now, sessionID, position)
+	if err != nil {
+		return SessionState{}, err
+	}
+	if tag.RowsAffected() != 1 {
+		return SessionState{}, ErrPositionConflict
+	}
+	state, err := readState(ctx, tx, userID, sessionID)
+	if err != nil {
+		return SessionState{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return SessionState{}, err
+	}
+	return state, nil
+}
+
+func (r Repository) Answer(ctx context.Context, userID, sessionID uuid.UUID, position int, rating string, now time.Time) (SessionState, error) {
+	tx, err := r.Pool.Begin(ctx)
+	if err != nil {
+		return SessionState{}, err
+	}
+	defer tx.Rollback(ctx)
+	status, err := lockSession(ctx, tx, userID, sessionID)
+	if err != nil {
+		return SessionState{}, err
+	}
+	var cardID uuid.UUID
+	var bucket string
+	var revealedAt *time.Time
+	var savedRating *string
+	err = tx.QueryRow(ctx, `SELECT card_id,selection_bucket,revealed_at,result
+		FROM study_session_cards WHERE session_id=$1 AND position=$2 FOR UPDATE`, sessionID, position).
+		Scan(&cardID, &bucket, &revealedAt, &savedRating)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return SessionState{}, ErrPositionConflict
+	}
+	if err != nil {
+		return SessionState{}, err
+	}
+	if savedRating != nil {
+		if *savedRating != rating {
+			return SessionState{}, ErrAnswerConflict
+		}
+		return readState(ctx, tx, userID, sessionID)
+	}
+	if status != "active" {
+		return SessionState{}, ErrSessionInactive
+	}
+	current, err := currentPosition(ctx, tx, sessionID)
+	if err != nil || current != position {
+		if err != nil {
+			return SessionState{}, err
+		}
+		return SessionState{}, ErrPositionConflict
+	}
+	if revealedAt == nil {
+		return SessionState{}, ErrNotRevealed
+	}
+	var correctCount, incorrectCount, streak int
+	var interval *int
+	var previousDue *time.Time
+	err = tx.QueryRow(ctx, `SELECT correct_count,incorrect_count,correct_streak,interval_days,due_at
+		FROM cards WHERE user_id=$1 AND id=$2 FOR UPDATE`, userID, cardID).
+		Scan(&correctCount, &incorrectCount, &streak, &interval, &previousDue)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return SessionState{}, ErrPositionConflict
+	}
+	if err != nil {
+		return SessionState{}, err
+	}
+	next := NextSchedule(rating == "correct", correctCount, incorrectCount, streak, interval, now)
+	_, err = tx.Exec(ctx, `INSERT INTO review_events(
+		user_id,session_id,card_id,rating,reviewed_early,previous_interval_days,next_interval_days,previous_due_at,next_due_at,created_at
+	) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, userID, sessionID, cardID, rating, bucket == "early", interval, next.IntervalDays, previousDue, next.DueAt, now)
+	if err != nil {
+		return SessionState{}, err
+	}
+	_, err = tx.Exec(ctx, `UPDATE cards SET correct_count=$1,incorrect_count=$2,correct_streak=$3,
+		interval_days=$4,last_reviewed_at=$5,due_at=$6,updated_at=$5 WHERE user_id=$7 AND id=$8`,
+		next.CorrectCount, next.IncorrectCount, next.CorrectStreak, next.IntervalDays, now, next.DueAt, userID, cardID)
+	if err != nil {
+		return SessionState{}, err
+	}
+	_, err = tx.Exec(ctx, `UPDATE study_session_cards SET result=$1,answered_at=$2
+		WHERE session_id=$3 AND position=$4`, rating, now, sessionID, position)
+	if err != nil {
+		return SessionState{}, err
+	}
+	var remaining int
+	if err = tx.QueryRow(ctx, `SELECT count(*) FROM study_session_cards WHERE session_id=$1 AND result IS NULL`, sessionID).Scan(&remaining); err != nil {
+		return SessionState{}, err
+	}
+	if remaining == 0 {
+		if _, err = tx.Exec(ctx, `UPDATE study_sessions SET status='completed',completed_at=$1 WHERE id=$2`, now, sessionID); err != nil {
+			return SessionState{}, err
+		}
+	}
+	state, err := readState(ctx, tx, userID, sessionID)
+	if err != nil {
+		return SessionState{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return SessionState{}, err
+	}
+	return state, nil
+}
+
+func (r Repository) Abandon(ctx context.Context, userID, sessionID uuid.UUID, now time.Time) error {
+	tag, err := r.Pool.Exec(ctx, `UPDATE study_sessions SET status='abandoned',completed_at=$1
+		WHERE user_id=$2 AND id=$3 AND status='active'`, now, userID, sessionID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 1 {
+		return nil
+	}
+	var status string
+	err = r.Pool.QueryRow(ctx, `SELECT status FROM study_sessions WHERE user_id=$1 AND id=$2`, userID, sessionID).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrSessionNotFound
+	}
+	if err != nil {
+		return err
+	}
+	return ErrSessionInactive
 }

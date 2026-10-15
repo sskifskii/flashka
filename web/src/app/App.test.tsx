@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -64,6 +64,52 @@ function folderTreeResponse() {
 }
 
 describe("authentication routes", () => {
+  it("continues an active study session after login", async () => {
+    const sessionId = crypto.randomUUID();
+    const state = {
+      id: sessionId,
+      actualCount: 2,
+      answeredCount: 1,
+      status: "active",
+      current: {
+        position: 2,
+        cardId: crypto.randomUUID(),
+        front: "Продолженный вопрос",
+        back: null,
+        revealed: false,
+      },
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path.endsWith("/auth/me")) return Promise.resolve(errorResponse(401));
+      if (path.endsWith("/auth/login") && init?.method === "POST")
+        return Promise.resolve(userResponse());
+      if (path.endsWith("/study/sessions/active"))
+        return Promise.resolve(
+          new Response(JSON.stringify({ session: state }), { status: 200 }),
+        );
+      if (path.endsWith(`/study/sessions/${sessionId}`))
+        return Promise.resolve(
+          new Response(JSON.stringify({ session: state }), { status: 200 }),
+        );
+      throw new Error(`unexpected request ${path}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderApp("/login");
+    await userEvent.type(await screen.findByLabelText("Логин"), "StudyUser");
+    await userEvent.type(screen.getByLabelText("Пароль"), "long password");
+    await userEvent.click(screen.getByRole("button", { name: "Войти" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
+      "/api/v1/auth/me",
+      "/api/v1/auth/login",
+      "/api/v1/study/sessions/active",
+      `/api/v1/study/sessions/${sessionId}`,
+    ]);
+    expect(await screen.findByText("Продолженный вопрос")).toBeVisible();
+    expect(screen.getByText("2 / 2")).toBeVisible();
+  });
+
   it("shows the recovery warning and inline client validation", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(errorResponse(401)));
     renderApp("/register");

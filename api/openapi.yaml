@@ -220,6 +220,80 @@ paths:
         "409": { $ref: "#/components/responses/AuthError" }
         "422": { $ref: "#/components/responses/AuthError" }
         "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions/active:
+    get:
+      summary: Get the newest active study session for continuation
+      operationId: getActiveStudySession
+      responses:
+        "200":
+          description: Active session at its first unanswered position.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudySessionStateEnvelope" } } }
+        "204": { description: There is no active session. }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions/{sessionId}:
+    parameters:
+      - { $ref: "#/components/parameters/StudySessionID" }
+    get:
+      summary: Get study session progress and its first unanswered position
+      operationId: getStudySession
+      responses:
+        "200":
+          description: Current session state; the back is null until reveal.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudySessionStateEnvelope" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions/{sessionId}/cards/{position}/reveal:
+    parameters:
+      - { $ref: "#/components/parameters/StudySessionID" }
+      - { $ref: "#/components/parameters/StudyPositionNumber" }
+    post:
+      summary: Idempotently reveal the current study position
+      operationId: revealStudyPosition
+      responses:
+        "200":
+          description: Current position with its back revealed.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudySessionStateEnvelope" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions/{sessionId}/cards/{position}/answer:
+    parameters:
+      - { $ref: "#/components/parameters/StudySessionID" }
+      - { $ref: "#/components/parameters/StudyPositionNumber" }
+    put:
+      summary: Idempotently answer the current revealed study position
+      operationId: answerStudyPosition
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/StudyAnswer" } } }
+      responses:
+        "200":
+          description: Persisted state at the next position or completed session.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudySessionStateEnvelope" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions/{sessionId}/abandon:
+    parameters:
+      - { $ref: "#/components/parameters/StudySessionID" }
+    post:
+      summary: Mark an active study session as abandoned
+      operationId: abandonStudySession
+      responses:
+        "204": { description: Session abandoned; prior answers remain saved. }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
   /health/live:
     get:
       summary: Check whether the HTTP process is alive
@@ -236,6 +310,17 @@ paths:
         "200": { $ref: "#/components/responses/HealthOK" }
         "503": { $ref: "#/components/responses/HealthError" }
 components:
+  parameters:
+    StudySessionID:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    StudyPositionNumber:
+      name: position
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
   securitySchemes:
     sessionCookie: { type: apiKey, in: cookie, name: flashka_session }
   headers:
@@ -471,6 +556,42 @@ components:
       required: [session]
       properties:
         session: { $ref: "#/components/schemas/StudySession" }
+    StudyCurrentPosition:
+      type: object
+      additionalProperties: false
+      required: [position, cardId, front, back, revealed]
+      properties:
+        position: { type: integer, minimum: 1 }
+        cardId: { type: string, format: uuid }
+        front: { $ref: "#/components/schemas/CardSide" }
+        back: { anyOf: [{ $ref: "#/components/schemas/CardSide" }, { type: "null" }] }
+        revealed: { type: boolean }
+    StudySessionState:
+      type: object
+      additionalProperties: false
+      required: [id, actualCount, answeredCount, status, current]
+      properties:
+        id: { type: string, format: uuid }
+        actualCount: { type: integer, minimum: 1, maximum: 100 }
+        answeredCount: { type: integer, minimum: 0, maximum: 100 }
+        status: { type: string, enum: [active, completed, abandoned] }
+        current:
+          anyOf:
+            - { $ref: "#/components/schemas/StudyCurrentPosition" }
+            - { type: "null" }
+    StudySessionStateEnvelope:
+      type: object
+      additionalProperties: false
+      required: [session]
+      properties:
+        session: { $ref: "#/components/schemas/StudySessionState" }
+    StudyAnswer:
+      type: object
+      additionalProperties: false
+      required: [rating, requestId]
+      properties:
+        rating: { type: string, enum: [correct, incorrect] }
+        requestId: { type: string, format: uuid }
   responses:
     RegisterCreated:
       description: User, Inbox and session were created atomically.

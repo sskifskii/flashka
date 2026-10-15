@@ -5,13 +5,14 @@ import {
   Outlet,
   Route,
   Routes,
+  useLocation,
   useNavigate,
 } from "react-router-dom";
 import { useAuth } from "../features/auth/AuthProvider";
 import { AuthForm } from "../features/auth/AuthForm";
 import { CardDetail, CardList, NewCard } from "../features/cards/Cards";
 import { StudySetup } from "../features/study/StudySetup";
-import { StudySessionStart } from "../features/study/StudySession";
+import { StudySessionRun } from "../features/study/StudySession";
 function Loading() {
   return (
     <main className="loading" aria-live="polite">
@@ -47,9 +48,17 @@ function BootstrapError() {
 }
 function GuestOnly() {
   const { user, status } = useAuth();
+  const location = useLocation();
   if (status === "loading") return <Loading />;
   if (status === "error") return <BootstrapError />;
-  return user ? <Navigate to="/app" replace /> : <Outlet />;
+  return user ? (
+    <Navigate
+      to={location.pathname === "/login" ? "/app/study/resume" : "/app"}
+      replace
+    />
+  ) : (
+    <Outlet />
+  );
 }
 function Protected() {
   const { user, status } = useAuth();
@@ -69,6 +78,7 @@ function Shell() {
           Flashka
         </Link>
         <div>
+          <Link to="/app/study/active">Учиться</Link>
           <span className="user-login">{user?.login}</span>
           <button
             className="secondary"
@@ -115,7 +125,7 @@ export function App() {
           <Route path="cards/new" element={<NewCard />} />
           <Route path="cards/:id" element={<CardDetail />} />
           <Route path="study/new" element={<StudySetup />} />
-          <Route path="study/:id" element={<StudySessionStart />} />
+          <Route path="study/:id" element={<StudySessionRun />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/app" replace />} />

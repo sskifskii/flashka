@@ -64,7 +64,7 @@ func TestRepositoryPreviewAndCreateUseOwnedRecursiveFixedScope(t *testing.T) {
 	dueRecent := now.Add(-time.Hour)
 	early := now.Add(24 * time.Hour)
 	insertCard(inboxID, &dueRecent, &thirty)
-	insertCard(childID, &dueOld, &one)
+	dueOldID := insertCard(childID, &dueOld, &one)
 	insertCard(childID, nil, nil)
 	insertCard(childID, &early, &one)
 
@@ -92,6 +92,42 @@ func TestRepositoryPreviewAndCreateUseOwnedRecursiveFixedScope(t *testing.T) {
 	}
 	if len(buckets) != 3 || buckets[0] != "due" || buckets[1] != "due" || buckets[2] != "new" {
 		t.Fatalf("buckets=%v", buckets)
+	}
+	state, err := repo.Get(ctx, userID, session.ID)
+	if err != nil || state.Current == nil || state.Current.Position != 1 || state.Current.Back != nil {
+		t.Fatalf("initial state=%#v err=%v", state, err)
+	}
+	if _, err = repo.Answer(ctx, userID, session.ID, 1, "correct", now); !errors.Is(err, ErrNotRevealed) {
+		t.Fatalf("answer before reveal err=%v", err)
+	}
+	state, err = repo.Reveal(ctx, userID, session.ID, 1, now)
+	if err != nil || state.Current == nil || !state.Current.Revealed || state.Current.Back == nil {
+		t.Fatalf("revealed state=%#v err=%v", state, err)
+	}
+	answeredAt := now.Add(time.Minute)
+	state, err = repo.Answer(ctx, userID, session.ID, 1, "correct", answeredAt)
+	if err != nil || state.AnsweredCount != 1 || state.Current == nil || state.Current.Position != 2 {
+		t.Fatalf("answered state=%#v err=%v", state, err)
+	}
+	if _, err = repo.Answer(ctx, userID, session.ID, 1, "correct", answeredAt.Add(time.Minute)); err != nil {
+		t.Fatalf("idempotent answer err=%v", err)
+	}
+	if _, err = repo.Answer(ctx, userID, session.ID, 1, "incorrect", answeredAt); !errors.Is(err, ErrAnswerConflict) {
+		t.Fatalf("conflicting answer err=%v", err)
+	}
+	var events, correct, interval int
+	var dueAt time.Time
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM review_events WHERE session_id=$1`, session.ID).Scan(&events); err != nil {
+		t.Fatal(err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT correct_count,interval_days,due_at FROM cards WHERE id=$1`, dueOldID).Scan(&correct, &interval, &dueAt); err != nil {
+		t.Fatal(err)
+	}
+	if events != 1 || correct != 2 || interval != 3 || !dueAt.Equal(answeredAt.AddDate(0, 0, 3)) {
+		t.Fatalf("events=%d correct=%d interval=%d due=%s", events, correct, interval, dueAt)
+	}
+	if _, err = repo.Get(ctx, otherUserID, session.ID); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("cross-tenant session err=%v", err)
 	}
 	if _, err = repo.Preview(ctx, userID, Scope{Type: "folder", FolderID: &otherInboxID}, now); !errors.Is(err, ErrFolderNotFound) {
 		t.Fatalf("cross-tenant preview err=%v other=%s", err, otherUserID)

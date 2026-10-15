@@ -351,6 +351,88 @@ button:disabled {
   overflow: hidden;
   clip: rect(0 0 0 0);
 }
+.study-run-nav,
+.study-rating-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.study-run-nav button {
+  margin: 0;
+}
+.study-run-nav a {
+  color: #3157d5;
+}
+.study-progress {
+  text-align: center;
+  color: #66708a;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.study-card {
+  position: relative;
+  display: grid;
+  gap: 24px;
+  min-height: 330px;
+  padding: clamp(24px, 6vw, 46px);
+  border: 1px solid #dfe4f0;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 18px 55px rgba(32, 54, 105, 0.09);
+  overflow: hidden;
+  touch-action: pan-y;
+  user-select: none;
+}
+.study-card > div {
+  display: grid;
+  align-content: center;
+}
+.study-card span {
+  color: #66708a;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.study-card p {
+  margin: 10px 0 0;
+  font-size: clamp(1.25rem, 4vw, 1.8rem);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.study-back {
+  padding-top: 24px;
+  border-top: 1px solid #dfe4f0;
+}
+.study-card.swipe-correct {
+  border-color: #62a779;
+  background: #f1fbf4;
+}
+.study-card.swipe-incorrect {
+  border-color: #ce7180;
+  background: #fff4f5;
+}
+.swipe-label {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  color: #17213c !important;
+}
+.study-reveal {
+  width: 100%;
+}
+.study-rating-actions button {
+  flex: 1;
+}
+.incorrect-action {
+  background: #a72a3e;
+}
+.study-shortcuts {
+  text-align: center;
+  margin-top: 14px;
+}
 .title-row h1,
 .content > h1 {
   margin-top: 8px;

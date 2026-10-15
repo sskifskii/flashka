@@ -45,6 +45,19 @@ export type StudySession = {
   createdAt: string;
   first: { position: number; cardId: string; front: string };
 };
+export type StudySessionState = {
+  id: string;
+  actualCount: number;
+  answeredCount: number;
+  status: "active" | "completed" | "abandoned";
+  current: {
+    position: number;
+    cardId: string;
+    front: string;
+    back: string | null;
+    revealed: boolean;
+  } | null;
+};
 export type APIError = {
   error: {
     code: string;
@@ -64,7 +77,7 @@ export class RequestError extends Error {
 async function request<T>(
   path: string,
   init?: RequestInit,
-  expectedStatus = 200,
+  expectedStatus: number | number[] = 200,
 ): Promise<T> {
   let response: Response;
   try {
@@ -80,7 +93,11 @@ async function request<T>(
     throw new RequestError(0);
   }
   if (response.status === 204) {
-    if (expectedStatus !== 204) throw new RequestError(response.status);
+    if (!(
+      expectedStatus === 204 ||
+      (Array.isArray(expectedStatus) && expectedStatus.includes(204))
+    ))
+      throw new RequestError(response.status);
     return undefined as T;
   }
   let body: unknown;
@@ -94,7 +111,11 @@ async function request<T>(
       window.dispatchEvent(new Event("flashka:unauthenticated"));
     throw new RequestError(response.status, body as APIError);
   }
-  if (response.status !== expectedStatus)
+  if (
+    !(Array.isArray(expectedStatus)
+      ? expectedStatus.includes(response.status)
+      : response.status === expectedStatus)
+  )
     throw new RequestError(response.status);
   return body as T;
 }
@@ -170,4 +191,29 @@ export const api = {
       { method: "POST", body: JSON.stringify(value) },
       201,
     ),
+  activeStudySession: () =>
+    request<{ session: StudySessionState } | undefined>(
+      "/study/sessions/active",
+      undefined,
+      [200, 204],
+    ),
+  studySession: (id: string) =>
+    request<{ session: StudySessionState }>(`/study/sessions/${id}`),
+  revealStudyPosition: (id: string, position: number) =>
+    request<{ session: StudySessionState }>(
+      `/study/sessions/${id}/cards/${position}/reveal`,
+      { method: "POST" },
+    ),
+  answerStudyPosition: (
+    id: string,
+    position: number,
+    rating: "correct" | "incorrect",
+    requestId: string,
+  ) =>
+    request<{ session: StudySessionState }>(
+      `/study/sessions/${id}/cards/${position}/answer`,
+      { method: "PUT", body: JSON.stringify({ rating, requestId }) },
+    ),
+  abandonStudySession: (id: string) =>
+    request<void>(`/study/sessions/${id}/abandon`, { method: "POST" }, 204),
 };

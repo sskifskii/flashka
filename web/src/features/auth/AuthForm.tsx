@@ -22,7 +22,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       const response =
         mode === "login" ? await api.login(value) : await api.register(value);
       auth.signedIn(response.user);
-      navigate("/app", { replace: true });
+      navigate(mode === "login" ? "/app/study/resume" : "/app", {
+        replace: true,
+      });
     } catch (e) {
       if (e instanceof RequestError) {
         for (const [name, message] of Object.entries(
