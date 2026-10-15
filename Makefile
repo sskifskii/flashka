@@ -5,7 +5,7 @@ export DATABASE_URL
 dev: db-up
 	$(MAKE) migrate-up
 	$(MAKE) web-build
-	go run ./cmd/server
+	./scripts/dev-server.sh
 web/node_modules/.flashka-install: web/package.json web/package-lock.json
 	cd web && npm ci
 	touch $@

@@ -43,10 +43,11 @@ make dev
 
 Команда поднимает PostgreSQL, применяет миграции, устанавливает frontend-зависимости
 при первом запуске или изменении lock-файла, собирает frontend и запускает Go-сервер.
-Приложение доступно на `http://localhost:8080`; остановить сервер можно через
-`Ctrl+C`, а PostgreSQL — командой `make db-down`. `make check` запускает локальные
-quality gates, `make test-integration` — PostgreSQL integration tests,
-`make test-e2e` — браузерный сценарий после установки Playwright Chromium.
+После запуска команда выводит адреса для этого компьютера и телефона в той же
+Wi-Fi-сети. Остановить сервер можно через `Ctrl+C`, а PostgreSQL — командой
+`make db-down`. `make check` запускает локальные quality gates,
+`make test-integration` — PostgreSQL integration tests, `make test-e2e` —
+браузерный сценарий после установки Playwright Chromium.
 
 ## Ключевые продуктовые решения
 
