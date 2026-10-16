@@ -206,7 +206,7 @@ describe("cards UI", () => {
     expect(cardsMock).toHaveBeenCalledTimes(2);
   });
 
-  it("validates both sides and preserves input after a network error", async () => {
+  it("flips between sides, validates them, and preserves input", async () => {
     vi.stubGlobal(
       "fetch",
       withTree(vi.fn().mockRejectedValue(new TypeError("offline"))),
@@ -216,16 +216,38 @@ describe("cards UI", () => {
         <NewCard />
       </MemoryRouter>,
     );
+    expect(screen.getByLabelText("Front")).toBeVisible();
+    expect(screen.queryByLabelText("Back")).not.toBeInTheDocument();
+
     await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
-    expect(screen.getAllByText("Поле обязательно")).toHaveLength(2);
-    await userEvent.type(screen.getByLabelText("Лицевая сторона"), "front");
-    await userEvent.type(screen.getByLabelText("Обратная сторона"), "back");
+    expect(screen.getByText("Поле обязательно")).toBeVisible();
+    await userEvent.type(screen.getByLabelText("Front"), "front");
+    await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+
+    expect(screen.queryByLabelText("Front")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Back")).toBeVisible();
+    expect(screen.getByLabelText("Back")).toHaveFocus();
+    expect(screen.getByText("Поле обязательно")).toBeVisible();
+    await userEvent.type(screen.getByLabelText("Back"), "back");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Развернуть на Front" }),
+    );
+    expect(screen.getByLabelText("Front")).toHaveValue("front");
+    expect(screen.getByLabelText("Front")).toHaveFocus();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Развернуть на Back" }),
+    );
+    expect(screen.getByLabelText("Back")).toHaveValue("back");
+
     await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Не удалось сохранить",
     );
-    expect(screen.getByLabelText("Лицевая сторона")).toHaveValue("front");
-    expect(screen.getByLabelText("Обратная сторона")).toHaveValue("back");
+    expect(screen.getByLabelText("Back")).toHaveValue("back");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Развернуть на Front" }),
+    );
+    expect(screen.getByLabelText("Front")).toHaveValue("front");
   });
 
   it("renders text safely and requires explicit delete confirmation", async () => {

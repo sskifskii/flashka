@@ -1295,26 +1295,47 @@ h1 {
     0 8px 24px rgba(39, 37, 34, 0.04);
 }
 
-.card-side-field label {
+.card-side-field.is-flippable {
+  min-height: min(420px, calc(100dvh - 260px));
+  grid-template-rows: auto minmax(160px, 1fr) auto;
+}
+
+.card-side-heading {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.card-side-field label {
   margin: 0;
-  color: var(--primary);
-  font-size: 0.85rem;
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-weight: 700;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
-.card-side-field label span {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: currentColor;
+.card-side-flip {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
 }
 
-.back-side-field label {
-  color: var(--sage);
+.card-side-flip:hover {
+  border-color: var(--line-strong);
+  background: var(--recessed);
+}
+
+.card-side-flip span {
+  font-size: 1rem;
 }
 
 .card-side-field textarea {
@@ -1327,6 +1348,11 @@ h1 {
   font-family: Newsreader, Georgia, serif;
   font-size: 1.35rem;
   line-height: 1.45;
+}
+
+.card-side-field.is-flippable textarea {
+  height: 100%;
+  resize: none;
 }
 
 .card-side-field textarea::placeholder {
@@ -1667,6 +1693,18 @@ select {
     padding-top: 26px;
   }
 
+  .card-editor-page {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .card-editor-form {
+    height: min(420px, 100dvh);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
   .collection {
     position: relative;
   }
@@ -1799,7 +1837,9 @@ select {
   }
 
   .shell .card-editor-header {
-    height: 88px;
+    height: 60px;
+    min-height: 60px;
+    flex: 0 0 60px;
   }
 
   .card-editor-page {
@@ -1807,8 +1847,15 @@ select {
   }
 
   .card-editor-header button {
-    min-width: 108px;
-    padding: 0 14px;
+    min-width: 100px;
+    min-height: 44px;
+    padding: 0 12px;
+  }
+
+  .folder-banner {
+    min-height: 44px;
+    flex: 0 0 44px;
+    padding-block: 0;
   }
 
   .card-side-field {
@@ -1816,9 +1863,23 @@ select {
     padding: 28px 32px;
   }
 
+  .card-side-field.is-flippable {
+    min-height: 0;
+    flex: 1 1 auto;
+    padding: 10px 16px;
+    gap: 6px;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
   .card-side-field textarea {
     min-height: 150px;
     font-size: 1.35rem;
+  }
+
+  .card-side-field.is-flippable textarea {
+    min-height: 0;
+    padding: 10px 12px;
+    font-size: 1.15rem;
   }
 
   .study-run {
@@ -1881,6 +1942,10 @@ select {
 
   .card-side-field {
     padding: 24px 20px;
+  }
+
+  .card-side-field.is-flippable {
+    padding: 10px 14px;
   }
 
   .study-run-nav .study-scope-chip {

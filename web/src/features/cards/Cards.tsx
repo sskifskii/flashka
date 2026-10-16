@@ -227,6 +227,8 @@ export function CardList() {
 }
 
 type FormValues = { front: string; back: string };
+type CardSide = keyof FormValues;
+
 function CardFields({
   values,
   setValues,
@@ -234,6 +236,8 @@ function CardFields({
   root,
   folderId,
   setFolderId,
+  activeSide,
+  onFlip,
 }: {
   values: FormValues;
   setValues: (v: FormValues) => void;
@@ -241,36 +245,54 @@ function CardFields({
   root?: FolderNode | null;
   folderId?: string;
   setFolderId?: (id: string) => void;
+  activeSide?: CardSide;
+  onFlip?: () => void;
 }) {
+  const sides: Array<{
+    id: CardSide;
+    label: string;
+    placeholder: string;
+  }> = [
+    { id: "front", label: "Front", placeholder: "Слово, вопрос или фраза" },
+    { id: "back", label: "Back", placeholder: "Ответ или пояснение" },
+  ];
+  const visibleSides = activeSide
+    ? sides.filter((side) => side.id === activeSide)
+    : sides;
+
   return (
     <>
-      <div className="card-side-field front-side-field">
-        <label htmlFor="front">
-          <span aria-hidden="true" /> Лицевая сторона
-        </label>
-        <textarea
-          id="front"
-          autoFocus
-          placeholder="Слово, вопрос или фраза"
-          value={values.front}
-          aria-invalid={!!errors.front}
-          onChange={(e) => setValues({ ...values, front: e.target.value })}
-        />
-        {errors.front && <p className="field-error">{errors.front}</p>}
-      </div>
-      <div className="card-side-field back-side-field">
-        <label htmlFor="back">
-          <span aria-hidden="true" /> Обратная сторона
-        </label>
-        <textarea
-          id="back"
-          placeholder="Ответ или пояснение"
-          value={values.back}
-          aria-invalid={!!errors.back}
-          onChange={(e) => setValues({ ...values, back: e.target.value })}
-        />
-        {errors.back && <p className="field-error">{errors.back}</p>}
-      </div>
+      {visibleSides.map((side) => (
+        <div
+          className={`card-side-field ${side.id}-side-field${onFlip ? " is-flippable" : ""}`}
+          key={side.id}
+        >
+          <div className="card-side-heading">
+            <label htmlFor={side.id}>{side.label}</label>
+            {onFlip && (
+              <button
+                type="button"
+                className="card-side-flip"
+                aria-label={`Развернуть на ${side.id === "front" ? "Back" : "Front"}`}
+                onClick={onFlip}
+              >
+                <span aria-hidden="true">↻</span> Развернуть
+              </button>
+            )}
+          </div>
+          <textarea
+            id={side.id}
+            autoFocus={side.id === (activeSide ?? "front")}
+            placeholder={side.placeholder}
+            value={values[side.id]}
+            aria-invalid={!!errors[side.id]}
+            onChange={(e) =>
+              setValues({ ...values, [side.id]: e.target.value })
+            }
+          />
+          {errors[side.id] && <p className="field-error">{errors[side.id]}</p>}
+        </div>
+      ))}
       {root && folderId && setFolderId && (
         <div className="folder-field">
           <label htmlFor="folder">Папка</label>
@@ -287,6 +309,7 @@ export function NewCard() {
   const folders = useFolderTree();
   const [folderId, setFolderId] = useState(params.get("folderId") ?? "");
   const [values, setValues] = useState<FormValues>({ front: "", back: "" });
+  const [activeSide, setActiveSide] = useState<CardSide>("front");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
   const [created, setCreated] = useState<Card | null>(null);
@@ -301,6 +324,7 @@ export function NewCard() {
     );
     if (Object.keys(clean).length) {
       setErrors(clean);
+      setActiveSide(local.front ? "front" : "back");
       return;
     }
     setPending(true);
@@ -313,9 +337,11 @@ export function NewCard() {
       });
       setCreated(data.card);
     } catch (e) {
-      if (e instanceof RequestError && e.body?.error.fields)
+      if (e instanceof RequestError && e.body?.error.fields) {
         setErrors(e.body.error.fields);
-      else if (!(e instanceof RequestError && e.status === 401))
+        if (e.body.error.fields.front) setActiveSide("front");
+        else if (e.body.error.fields.back) setActiveSide("back");
+      } else if (!(e instanceof RequestError && e.status === 401))
         setErrors({
           form: "Не удалось сохранить карточку. Попробуйте ещё раз.",
         });
@@ -334,6 +360,7 @@ export function NewCard() {
             onClick={() => {
               setCreated(null);
               setValues({ front: "", back: "" });
+              setActiveSide("front");
             }}
           >
             Добавить ещё
@@ -371,7 +398,15 @@ export function NewCard() {
             />
           </div>
         )}
-        <CardFields values={values} setValues={setValues} errors={errors} />
+        <CardFields
+          values={values}
+          setValues={setValues}
+          errors={errors}
+          activeSide={activeSide}
+          onFlip={() =>
+            setActiveSide((side) => (side === "front" ? "back" : "front"))
+          }
+        />
         {folders.error && (
           <p className="form-error" role="alert">
             {folders.error} Новая карточка будет сохранена в Inbox.

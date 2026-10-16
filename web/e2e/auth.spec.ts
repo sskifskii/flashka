@@ -14,8 +14,9 @@ test("register reload cross-tab logout and login", async ({
   await page.reload();
   await expect(page.getByRole("heading", { name: "Карточки" })).toBeVisible();
   await page.getByRole("link", { name: "Добавить карточку" }).first().click();
-  await page.getByLabel("Лицевая сторона").fill("  <script>front</script>  ");
-  await page.getByLabel("Обратная сторона").fill("back\nline");
+  await page.getByLabel("Front").fill("  <script>front</script>  ");
+  await page.getByRole("button", { name: "Развернуть на Back" }).click();
+  await page.getByLabel("Back").fill("back\nline");
   await page.getByRole("button", { name: "Сохранить" }).click();
   await expect(page.getByText("Карточка сохранена")).toBeVisible();
   await page.getByRole("link", { name: "Открыть карточку" }).click();
@@ -25,7 +26,7 @@ test("register reload cross-tab logout and login", async ({
   await page.reload();
   await expect(page.getByText("back\nline", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Редактировать" }).click();
-  await page.getByLabel("Лицевая сторона").fill("changed front");
+  await page.getByLabel("Front").fill("changed front");
   await page.getByRole("button", { name: "Сохранить" }).click();
   await expect(page.getByText("changed front", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Удалить" }).click();
@@ -102,8 +103,9 @@ test("manages nested folders and moves a card", async ({ page }) => {
 
   await page.getByRole("link", { name: "Добавить карточку" }).first().click();
   await expect(page.getByLabel("Папка")).toHaveValue(/.+/);
-  await page.getByLabel("Лицевая сторона").fill("folder front");
-  await page.getByLabel("Обратная сторона").fill("folder back");
+  await page.getByLabel("Front").fill("folder front");
+  await page.getByRole("button", { name: "Развернуть на Back" }).click();
+  await page.getByLabel("Back").fill("folder back");
   await page.getByRole("button", { name: "Сохранить" }).click();
   await page.getByRole("link", { name: "Открыть карточку" }).click();
   await page.getByRole("button", { name: "Редактировать" }).click();
