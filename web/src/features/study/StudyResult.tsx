@@ -109,11 +109,11 @@ export function StudyResult() {
           {result.errors.map((item) => (
             <article key={item.cardId}>
               <div>
-                <span>Лицевая сторона</span>
+                <span className="card-side-label">Front</span>
                 <p>{item.front}</p>
               </div>
               <div>
-                <span>Обратная сторона</span>
+                <span className="card-side-label">Back</span>
                 <p>{item.back}</p>
               </div>
             </article>

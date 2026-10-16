@@ -75,6 +75,10 @@ it("hides the back until reveal and answers by keyboard", async () => {
   );
 
   expect(await screen.findByText("Вопрос")).toBeVisible();
+  expect(screen.getByText("Front", { exact: true })).toHaveClass(
+    "card-side-label",
+  );
+  expect(screen.queryByText("Back", { exact: true })).not.toBeInTheDocument();
   expect(screen.queryByText("Ответ")).not.toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: "Вспомнил →" }),
@@ -82,6 +86,9 @@ it("hides the back until reveal and answers by keyboard", async () => {
 
   await userEvent.click(screen.getByRole("button", { name: "Показать ответ" }));
   expect(await screen.findByText("Ответ")).toBeVisible();
+  expect(screen.getByText("Back", { exact: true })).toHaveClass(
+    "card-side-label",
+  );
   await userEvent.keyboard("{ArrowRight}");
   expect(await screen.findByText("Итог раунда")).toBeVisible();
 

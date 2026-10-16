@@ -604,12 +604,6 @@ button:disabled {
 .detail {
   margin: 24px 0;
 }
-.detail h2 {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  color: #66708a;
-  margin: 0;
-}
 .detail p {
   margin: 0;
   line-height: 1.55;
@@ -1340,12 +1334,16 @@ h1 {
   gap: 16px;
 }
 
-.card-side-field label {
+.card-side-label {
+  display: block;
   margin: 0;
   color: var(--faint);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-align: left;
+  text-transform: uppercase;
 }
 
 .card-side-flip {
@@ -1580,16 +1578,18 @@ select {
     16px 18px 0 -11px #f5ece4;
 }
 
-.study-card > div {
+.study-card > .study-card-side {
+  min-height: 0;
+  flex: 1 1 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: center;
   width: 100%;
-  text-align: center;
-}
-
-.study-card span {
-  color: var(--faint);
 }
 
 .study-card p {
+  margin: 0;
+  text-align: center;
   font-family: Newsreader, Georgia, serif;
   font-size: clamp(1.75rem, 5vw, 2.35rem);
   line-height: 1.35;
@@ -1633,9 +1633,14 @@ select {
   color: var(--faint);
 }
 
-.detail h2,
-.result-errors span {
-  color: var(--muted);
+.card-detail-side {
+  display: grid;
+  gap: 10px;
+}
+
+.card-detail-side + .card-detail-side {
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
 }
 
 .result-errors article {

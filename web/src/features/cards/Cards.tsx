@@ -276,7 +276,9 @@ function CardFields({
         key={side.id}
       >
         <div className="card-side-heading">
-          <label htmlFor={side.id}>{side.label}</label>
+          <label className="card-side-label" htmlFor={side.id}>
+            {side.label}
+          </label>
           {flippable && (
             <button
               type="button"
@@ -614,10 +616,14 @@ export function CardDetail() {
             <small className={`status-badge status-${card.status}`}>
               {statusLabels[card.status]}
             </small>
-            <h2>Лицевая сторона</h2>
-            <p>{card.front}</p>
-            <h2>Обратная сторона</h2>
-            <p>{card.back}</p>
+            <div className="card-detail-side">
+              <span className="card-side-label">Front</span>
+              <p>{card.front}</p>
+            </div>
+            <div className="card-detail-side">
+              <span className="card-side-label">Back</span>
+              <p>{card.back}</p>
+            </div>
           </article>
           <dl className="card-progress">
             <div>

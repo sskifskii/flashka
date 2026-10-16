@@ -251,13 +251,13 @@ export function StudySessionRun() {
         }}
       >
         {swipeLabel && <span className="swipe-label">{swipeLabel}</span>}
-        <div>
-          <span>Лицевая сторона</span>
+        <div className="study-card-side">
+          <span className="card-side-label">Front</span>
           <p>{current.front}</p>
         </div>
         {current.revealed && (
-          <div className="study-back">
-            <span>Обратная сторона</span>
+          <div className="study-card-side study-back">
+            <span className="card-side-label">Back</span>
             <p>{current.back}</p>
           </div>
         )}

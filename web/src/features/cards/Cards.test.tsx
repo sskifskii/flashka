@@ -299,6 +299,12 @@ describe("cards UI", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText("<script>alert(1)</script>")).toBeVisible();
+    expect(screen.getByText("Front", { exact: true })).toHaveClass(
+      "card-side-label",
+    );
+    expect(screen.getByText("Back", { exact: true })).toHaveClass(
+      "card-side-label",
+    );
     expect(document.querySelector("script")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Удалить" }));
     expect(screen.getByRole("dialog")).toBeVisible();

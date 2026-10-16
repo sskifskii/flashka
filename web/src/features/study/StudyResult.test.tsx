@@ -43,6 +43,12 @@ it("shows totals, errors and a repeat link for the same folder", async () => {
   ).toBeVisible();
   expect(screen.getByText("67%")).toBeVisible();
   expect(screen.getByText("Вопрос")).toBeVisible();
+  expect(screen.getByText("Front", { exact: true })).toHaveClass(
+    "card-side-label",
+  );
+  expect(screen.getByText("Back", { exact: true })).toHaveClass(
+    "card-side-label",
+  );
   expect(
     screen.getByRole("link", { name: "Повторить эту область" }),
   ).toHaveAttribute("href", `/app/study/new?folderId=${folderId}`);
