@@ -44,6 +44,20 @@ function ErrorBox({ message, retry }: { message: string; retry?: () => void }) {
   );
 }
 
+function findFolderPath(
+  node: FolderNode,
+  selectedId: string,
+  ancestors: FolderNode[] = [],
+): FolderNode[] | undefined {
+  const path = [...ancestors, node];
+  if (node.id === selectedId) return path;
+  for (const child of node.children) {
+    const childPath = findFolderPath(child, selectedId, path);
+    if (childPath) return childPath;
+  }
+  return undefined;
+}
+
 export function CardList() {
   const [params, setParams] = useSearchParams();
   const requestedFolder = params.get("folderId") ?? undefined;
@@ -107,6 +121,9 @@ export function CardList() {
   const selected = folders.root
     ? flattenFolders(folders.root).find((folder) => folder.id === selectedId)
     : undefined;
+  const selectedPath = folders.root
+    ? (findFolderPath(folders.root, selectedId) ?? [folders.root])
+    : [];
   const selectFolder = (node: FolderNode) => {
     setParams(node.isInbox ? {} : { folderId: node.id });
     setFoldersOpen(false);
@@ -146,20 +163,38 @@ export function CardList() {
         </div>
       )}
       <div className="collection-cards">
-        <div className="title-row">
-          <div>
-            <p className="eyebrow">Коллекция &nbsp;›&nbsp; Карточки</p>
-            <h1 aria-label="Карточки">{selected?.name ?? "Карточки"}</h1>
-          </div>
-          <div className="title-actions">
+        <div className="collection-header">
+          <h1 className="folder-breadcrumb" aria-label="Карточки">
+            {selectedPath.length > 0
+              ? selectedPath.map((folder, index) => (
+                  <span className="folder-breadcrumb-part" key={folder.id}>
+                    {index > 0 && <span aria-hidden="true">›</span>}
+                    {index < selectedPath.length - 1 ? (
+                      <Link
+                        to={
+                          folder.id === folders.root?.id
+                            ? "/app"
+                            : `/app?folderId=${folder.id}`
+                        }
+                      >
+                        {folder.name}
+                      </Link>
+                    ) : (
+                      <span aria-current="page">{folder.name}</span>
+                    )}
+                  </span>
+                ))
+              : "Карточки"}
+          </h1>
+          <div className="collection-actions">
             <Link
-              className="button-link secondary-link"
+              className="button-link collection-study-action"
               to={`/app/study/new${requestedFolder ? `?folderId=${requestedFolder}` : ""}`}
             >
               <span aria-hidden="true">▷</span> Учить
             </Link>
             <Link
-              className="button-link"
+              className="button-link collection-add-action"
               aria-label="Добавить карточку"
               to={`/app/cards/new${requestedFolder ? `?folderId=${requestedFolder}` : ""}`}
             >

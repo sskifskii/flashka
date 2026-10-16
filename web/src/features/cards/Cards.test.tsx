@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -90,6 +90,77 @@ describe("cards UI", () => {
     expect(
       screen.queryByLabelText("Загрузка карточек"),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the selected folder path and both card sides", async () => {
+    const rootId = "00000000-0000-4000-8000-000000000002";
+    const childId = "00000000-0000-4000-8000-000000000003";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        if (String(input).endsWith("/folders/tree")) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                root: {
+                  id: rootId,
+                  parentId: null,
+                  name: "Inbox",
+                  isInbox: true,
+                  directCardCount: 0,
+                  totalCardCount: 1,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  children: [
+                    {
+                      id: childId,
+                      parentId: rootId,
+                      name: "Языки",
+                      isInbox: false,
+                      directCardCount: 1,
+                      totalCardCount: 1,
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                      children: [],
+                    },
+                  ],
+                },
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            ),
+          );
+        }
+        return Promise.resolve(
+          listResponse(
+            [summary("00000000-0000-4000-8000-000000000001", "bonjour")],
+            null,
+          ),
+        );
+      }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={[`/app?folderId=${childId}`]}>
+        <CardList />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("bonjour back")).toBeVisible();
+    const heading = screen.getByRole("heading", { name: "Карточки" });
+    expect(heading).toBeVisible();
+    expect(screen.getByRole("link", { name: "Inbox" })).toHaveAttribute(
+      "href",
+      "/app",
+    );
+    expect(within(heading).getByText("Языки")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByRole("link", { name: /Учить/ })).toHaveAttribute(
+      "href",
+      `/app/study/new?folderId=${childId}`,
+    );
+    expect(screen.queryByText(/Коллекция.*Карточки/)).not.toBeInTheDocument();
   });
 
   it("retries an initial list error and shows the successful result", async () => {

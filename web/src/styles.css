@@ -1119,10 +1119,73 @@ h1 {
   border: 1px solid var(--line-strong);
 }
 
+.collection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.folder-breadcrumb {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0;
+  font-family: "Plus Jakarta Sans", Avenir, sans-serif;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.folder-breadcrumb-part {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.folder-breadcrumb a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.folder-breadcrumb a:hover {
+  color: var(--primary);
+}
+
+.folder-breadcrumb [aria-current="page"] {
+  overflow-wrap: anywhere;
+}
+
+.collection-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 10px;
+}
+
+.collection-actions .button-link {
+  min-height: 46px;
+  gap: 8px;
+  padding: 9px 18px;
+}
+
+.collection-study-action {
+  min-width: 180px;
+}
+
+.collection-add-action {
+  color: var(--primary);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+}
+
 .card-grid {
   grid-template-columns: 1fr;
-  gap: 16px;
-  margin-top: 38px;
+  gap: 10px;
+  margin-top: 24px;
 }
 
 .card-item,
@@ -1147,19 +1210,36 @@ h1 {
     0 16px 36px rgba(39, 37, 34, 0.07);
 }
 
-.card-item strong,
 .detail p {
   font-family: Newsreader, Georgia, serif;
   font-size: clamp(1.28rem, 2.2vw, 1.65rem);
   line-height: 1.35;
 }
 
+.card-item {
+  position: relative;
+  min-height: 76px;
+  align-content: center;
+  gap: 4px;
+  padding: 13px 104px 13px 20px;
+}
+
+.card-item strong {
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
 .card-preview-back {
-  display: -webkit-box;
-  overflow: hidden;
   color: var(--muted) !important;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
+  font-size: 0.94rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.card-item .status-badge {
+  position: absolute;
+  top: 14px;
+  right: 16px;
 }
 
 .status-badge {
@@ -1740,24 +1820,26 @@ select {
 }
 
 .card-detail-content {
-  margin: 22px 0 38px;
+  margin: 18px 0 28px;
   padding: 0;
   overflow: hidden;
 }
 
 .card-detail-content .card-detail-side {
-  min-height: 220px;
+  min-height: 148px;
   align-content: center;
-  padding: 32px 40px;
+  padding: 24px 32px;
 }
 
 .card-detail-content .card-detail-side + .card-detail-side {
-  padding-top: 32px;
+  padding-top: 24px;
 }
 
 .card-detail-content p {
   max-width: 680px;
+  max-height: 6.75em;
   margin-inline: auto;
+  overflow-y: auto;
   text-align: center;
   white-space: pre-wrap;
 }
@@ -1769,15 +1851,15 @@ select {
 
 .card-statistics .card-progress {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: 30px;
+  margin-bottom: 22px;
 }
 
 .card-statistics .card-progress div {
-  min-height: 94px;
+  min-height: 78px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 18px 20px;
+  padding: 13px 16px;
 }
 
 .card-statistics .card-progress dd {
@@ -1904,6 +1986,10 @@ select {
     min-height: 52px;
   }
 
+  .shell:has(.card-detail-page) > .app-header {
+    height: 80px;
+  }
+
   .header-study-link,
   .user-login {
     display: none;
@@ -1916,7 +2002,8 @@ select {
 
   .card-detail-page {
     width: min(100% - 32px, 860px);
-    padding-top: 18px;
+    padding-top: 10px;
+    padding-bottom: 24px;
   }
 
   .card-detail-nav {
@@ -1931,43 +2018,76 @@ select {
   }
 
   .card-detail-header {
-    margin-top: 20px;
+    margin-top: 10px;
+  }
+
+  .card-detail-header .eyebrow {
+    display: none;
   }
 
   .card-detail-header h1 {
-    font-size: 1.95rem;
+    margin-top: 0;
+    font-size: 1.65rem;
     white-space: nowrap;
   }
 
   .card-detail-content {
-    margin: 18px 0 30px;
+    margin: 10px 0 18px;
   }
 
   .card-detail-content .card-detail-side {
-    min-height: 180px;
-    padding: 26px 24px;
+    min-height: 0;
+    padding: 15px 18px;
   }
 
   .card-detail-content .card-detail-side + .card-detail-side {
-    padding-top: 26px;
+    padding-top: 15px;
+  }
+
+  .card-detail-content p {
+    max-height: 4.05em;
+    font-size: 1.2rem;
+  }
+
+  .card-statistics h2 {
+    margin-bottom: 10px;
+    font-size: 1.25rem;
   }
 
   .card-statistics .card-progress {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
   }
 
   .card-statistics .card-progress div {
-    min-height: 88px;
-    padding: 15px;
+    min-height: 74px;
+    padding: 10px;
+  }
+
+  .card-statistics .card-progress dt {
+    font-size: 0.68rem;
+    line-height: 1.2;
+  }
+
+  .card-statistics .card-progress dd {
+    margin-top: 4px;
+    font-size: 1rem;
+    line-height: 1.15;
   }
 
   .card-detail-actions {
     display: grid;
     grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding-top: 0;
   }
 
   .card-detail-actions button {
     min-width: 0;
+    min-height: 44px;
+    margin-top: 0;
+    padding-block: 8px;
   }
 
   .card-editor-page {
@@ -2094,23 +2214,63 @@ select {
     box-shadow: 0 12px 30px rgba(103, 38, 21, 0.2);
   }
 
+  .collection-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .folder-breadcrumb {
+    grid-column: 1 / -1;
+    font-size: 0.9rem;
+  }
+
+  .collection-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    flex: 0 0 auto;
+  }
+
+  .collection-study-action {
+    width: 100%;
+    min-height: 58px !important;
+  }
+
+  .collection-add-action {
+    position: fixed;
+    right: 20px;
+    bottom: max(24px, env(safe-area-inset-bottom));
+    z-index: 10;
+    min-width: 132px;
+    min-height: 58px !important;
+    color: white;
+    background: var(--primary);
+    border: 0;
+    border-radius: 999px;
+    box-shadow: 0 12px 30px rgba(103, 38, 21, 0.2);
+  }
+
   .card-grid {
-    margin-top: 42px;
+    margin-top: 20px;
   }
 
   .card-item {
-    min-height: 112px;
-    justify-content: center;
-    padding: 24px 28px;
+    min-height: 72px;
+    padding: 12px 88px 12px 16px;
   }
 
-  .card-item .status-badge,
-  .card-preview-back {
-    display: none;
+  .card-item .status-badge {
+    top: 12px;
+    right: 12px;
   }
 
   .card-item strong {
-    font-size: 1.4rem;
+    font-size: 1rem;
+  }
+
+  .card-preview-back {
+    font-size: 0.9rem;
   }
 
   .shell .card-editor-header {
