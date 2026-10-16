@@ -28,7 +28,19 @@ export function StudySessionRun() {
   const [error, setError] = useState("");
   const [missingActive, setMissingActive] = useState(false);
   const [drag, setDrag] = useState(0);
+  const [cardSide, setCardSide] = useState<{
+    positionKey: string;
+    showBack: boolean;
+  } | null>(null);
   const pointerStart = useRef<number | null>(null);
+  const suppressCardClick = useRef(false);
+  const positionKey = session?.current
+    ? `${session.id}:${session.current.position}:${session.current.revealed}`
+    : "";
+  const showBack =
+    cardSide?.positionKey === positionKey
+      ? cardSide.showBack
+      : Boolean(session?.current?.revealed);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -132,6 +144,15 @@ export function StudySessionRun() {
     [pending, session],
   );
 
+  const flipCard = () => {
+    if (!session?.current || pending) return;
+    if (!session.current.revealed) {
+      void reveal();
+      return;
+    }
+    setCardSide({ positionKey, showBack: !showBack });
+  };
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return;
@@ -156,16 +177,19 @@ export function StudySessionRun() {
   const pointerDown = (event: PointerEvent<HTMLElement>) => {
     if (!session?.current?.revealed || pending) return;
     pointerStart.current = event.clientX;
+    suppressCardClick.current = false;
     event.currentTarget.setPointerCapture?.(event.pointerId);
   };
   const pointerMove = (event: PointerEvent<HTMLElement>) => {
     if (pointerStart.current === null) return;
     setDrag(event.clientX - pointerStart.current);
   };
-  const pointerUp = () => {
-    const distance = drag;
+  const pointerUp = (event: PointerEvent<HTMLElement>) => {
+    if (pointerStart.current === null) return;
+    const distance = event.clientX - pointerStart.current;
     pointerStart.current = null;
     setDrag(0);
+    suppressCardClick.current = Math.abs(distance) >= 8;
     if (Math.abs(distance) < 70) return;
     void answer(distance > 0 ? "correct" : "incorrect");
   };
@@ -242,36 +266,65 @@ export function StudySessionRun() {
       </div>
       <article
         className={`study-card ${drag > 20 ? "swipe-correct" : ""} ${drag < -20 ? "swipe-incorrect" : ""}`}
+        role="button"
+        tabIndex={0}
+        aria-label={
+          current.revealed
+            ? showBack
+              ? "Показать лицевую сторону"
+              : "Показать обратную сторону"
+            : "Показать обратную сторону"
+        }
+        aria-busy={pending}
+        aria-disabled={pending}
+        onClick={() => {
+          if (suppressCardClick.current) {
+            suppressCardClick.current = false;
+            return;
+          }
+          flipCard();
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== " " && event.key !== "Enter") return;
+          event.preventDefault();
+          event.stopPropagation();
+          flipCard();
+        }}
         onPointerDown={pointerDown}
         onPointerMove={pointerMove}
         onPointerUp={pointerUp}
         onPointerCancel={() => {
           pointerStart.current = null;
           setDrag(0);
+          suppressCardClick.current = false;
         }}
       >
         {swipeLabel && <span className="swipe-label">{swipeLabel}</span>}
-        <div className="study-card-side">
-          <span className="card-side-label">Front</span>
-          <p>{current.front}</p>
-        </div>
-        {current.revealed && (
-          <div className="study-card-side study-back">
-            <span className="card-side-label">Back</span>
-            <p>{current.back}</p>
+        <div className={`study-card-flip${showBack ? " show-back" : ""}`}>
+          <div
+            className="study-card-side study-card-face study-front"
+            aria-hidden={showBack}
+          >
+            <span className="card-side-label">Front</span>
+            <p>{current.front}</p>
           </div>
-        )}
+          {current.revealed && (
+            <div
+              className="study-card-side study-card-face study-back"
+              aria-hidden={!showBack}
+            >
+              <span className="card-side-label">Back</span>
+              <p>{current.back}</p>
+            </div>
+          )}
+        </div>
       </article>
       {error && (
         <p className="form-error" role="alert">
           {error}
         </p>
       )}
-      {!current.revealed ? (
-        <button className="study-reveal" disabled={pending} onClick={reveal}>
-          {pending ? "Открываем…" : "Показать ответ"}
-        </button>
-      ) : (
+      {current.revealed && (
         <div className="study-rating-actions">
           <button
             className="incorrect-action"
@@ -287,8 +340,8 @@ export function StudySessionRun() {
       )}
       <p className="field-hint study-shortcuts">
         {!current.revealed
-          ? "Space или Enter — показать ответ"
-          : "Стрелки или свайп — выбрать результат"}
+          ? "Нажмите карточку, Space или Enter — показать ответ"
+          : "Нажмите карточку — перевернуть; стрелки или свайп — выбрать результат"}
       </p>
     </section>
   );

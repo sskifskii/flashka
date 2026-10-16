@@ -6,7 +6,7 @@ import { StudySessionRun } from "./StudySession";
 
 afterEach(() => vi.unstubAllGlobals());
 
-it("hides the back until reveal and answers by keyboard", async () => {
+it("reveals and flips the card by click, then answers by keyboard", async () => {
   const sessionId = crypto.randomUUID();
   const cardId = crypto.randomUUID();
   const base = {
@@ -83,11 +83,29 @@ it("hides the back until reveal and answers by keyboard", async () => {
   expect(
     screen.queryByRole("button", { name: "Вспомнил →" }),
   ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Показать ответ" }),
+  ).not.toBeInTheDocument();
 
-  await userEvent.click(screen.getByRole("button", { name: "Показать ответ" }));
-  expect(await screen.findByText("Ответ")).toBeVisible();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Показать обратную сторону" }),
+  );
+  const answer = await screen.findByText("Ответ");
+  expect(answer.closest(".study-card-face")).toHaveAttribute(
+    "aria-hidden",
+    "false",
+  );
   expect(screen.getByText("Back", { exact: true })).toHaveClass(
     "card-side-label",
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: "Показать лицевую сторону" }),
+  );
+  expect(
+    screen.getByText("Вопрос").closest(".study-card-face"),
+  ).toHaveAttribute("aria-hidden", "false");
+  await userEvent.click(
+    screen.getByRole("button", { name: "Показать обратную сторону" }),
   );
   await userEvent.keyboard("{ArrowRight}");
   expect(await screen.findByText("Итог раунда")).toBeVisible();

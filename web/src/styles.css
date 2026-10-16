@@ -1296,6 +1296,11 @@ h1 {
   perspective: 1000px;
 }
 
+.study-card:focus-visible {
+  outline: 3px solid #9fb2ff;
+  outline-offset: 3px;
+}
+
 .card-flip-card {
   position: relative;
   width: 100%;
@@ -1563,28 +1568,56 @@ select {
 }
 
 .study-card {
-  min-height: min(56vh, 540px);
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: clamp(28px, 7vw, 56px);
-  border-color: var(--line);
-  border-radius: 24px;
+  height: min(420px, 42vh);
+  min-height: 280px;
+  flex: 0 0 auto;
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  cursor: pointer;
+  perspective: 1000px;
+}
+
+.study-card-flip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  border: 1px solid var(--line);
+  border-radius: inherit;
   background: var(--paper-strong);
   box-shadow:
     0 1px 2px rgba(39, 37, 34, 0.03),
     0 12px 32px rgba(39, 37, 34, 0.06),
     16px 18px 0 -11px #f5ece4;
+  transform-style: preserve-3d;
+  transition: transform var(--card-flip-duration) ease-in-out;
 }
 
-.study-card > .study-card-side {
-  min-height: 0;
-  flex: 1 1 0;
+.study-card-flip.show-back {
+  transform: rotateY(180deg);
+}
+
+.study-card-face {
+  position: absolute;
+  inset: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   align-items: center;
-  width: 100%;
+  padding: clamp(28px, 7vw, 56px);
+  overflow-y: auto;
+  border-radius: inherit;
+  background: inherit;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.study-card-face[aria-hidden="true"] {
+  pointer-events: none;
 }
 
 .study-card p {
@@ -1596,22 +1629,18 @@ select {
 }
 
 .study-back {
-  border-top-color: var(--line);
+  border-top: 0;
+  transform: rotateY(180deg);
 }
 
-.study-card.swipe-correct {
+.study-card.swipe-correct .study-card-flip {
   border-color: #91aa89;
   background: #f8fcf6;
 }
 
-.study-card.swipe-incorrect {
+.study-card.swipe-incorrect .study-card-flip {
   border-color: #d88782;
   background: #fff8f7;
-}
-
-.study-reveal {
-  margin-top: 28px;
-  min-height: 64px;
 }
 
 .study-rating-actions {
@@ -1960,7 +1989,8 @@ select {
   }
 
   .study-card {
-    min-height: 52vh;
+    height: 300px;
+    min-height: 260px;
   }
 
   .study-card p {
@@ -2026,8 +2056,9 @@ select {
   }
 
   .study-card {
-    min-height: 48vh;
-    border-radius: 20px;
+    height: 280px;
+    min-height: 240px;
+    border-radius: 18px;
   }
 
   .study-rating-actions {
