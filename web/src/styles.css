@@ -1769,6 +1769,7 @@ select {
     right: 20px;
     bottom: max(24px, env(safe-area-inset-bottom));
     z-index: 10;
+    width: auto;
     min-width: 132px;
     min-height: 58px;
     color: white;
