@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useId, useMemo, useState } from "react";
 import { api, FolderNode, RequestError } from "../../shared/api";
 import { normalizeFolderName, validateFolderName } from "./validation";
 
@@ -59,35 +59,70 @@ function TreeNode({
   onSelect: (node: FolderNode) => void;
   showChildren?: boolean;
 }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const childrenId = useId();
+  const hasChildren = showChildren && node.children.length > 0;
+
   return (
     <li>
-      <button
+      <div
         className={`folder-node ${selectedId === node.id ? "selected" : ""}`}
-        aria-current={selectedId === node.id ? "page" : undefined}
-        onClick={() => onSelect(node)}
       >
-        <span className="folder-node-name">
-          <span className="tree-chevron" aria-hidden="true">
-            {showChildren && node.children.length > 0 ? "⌄" : ""}
+        {hasChildren ? (
+          <button
+            type="button"
+            className="folder-node-toggle"
+            aria-label={`${collapsed ? "Развернуть" : "Свернуть"} папку ${node.name}`}
+            aria-expanded={!collapsed}
+            aria-controls={childrenId}
+            onClick={() => setCollapsed((value) => !value)}
+          >
+            <span
+              className={`tree-chevron ${collapsed ? "" : "expanded"}`}
+              aria-hidden="true"
+            >
+              ›
+            </span>
+            <span className="folder-icon" aria-hidden="true" />
+          </button>
+        ) : (
+          <span className="folder-node-decoration" aria-hidden="true">
+            <span className="tree-chevron" />
+            <span className="folder-icon" />
           </span>
-          <span className="folder-icon" aria-hidden="true" />
-          <span>{node.name}</span>
-        </span>
-        <small>
-          {node.directCardCount} / {node.totalCardCount}
-        </small>
-      </button>
-      {showChildren && node.children.length > 0 && (
-        <ul>
-          {node.children.map((child) => (
-            <TreeNode
-              node={child}
-              selectedId={selectedId}
-              onSelect={onSelect}
-              key={child.id}
-            />
-          ))}
-        </ul>
+        )}
+        <button
+          type="button"
+          className="folder-node-select"
+          aria-current={selectedId === node.id ? "page" : undefined}
+          onClick={() => onSelect(node)}
+        >
+          <span className="folder-node-name">{node.name}</span>
+          <small>
+            {node.directCardCount} / {node.totalCardCount}
+          </small>
+        </button>
+      </div>
+      {hasChildren && (
+        <div
+          id={childrenId}
+          className={`folder-children ${collapsed ? "collapsed" : ""}`}
+          aria-hidden={collapsed}
+          inert={collapsed ? true : undefined}
+        >
+          <div className="folder-children-clip">
+            <ul>
+              {node.children.map((child) => (
+                <TreeNode
+                  node={child}
+                  selectedId={selectedId}
+                  onSelect={onSelect}
+                  key={child.id}
+                />
+              ))}
+            </ul>
+          </div>
+        </div>
       )}
     </li>
   );

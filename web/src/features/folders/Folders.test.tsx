@@ -53,7 +53,7 @@ describe("folder panel", () => {
       />,
     );
     expect(screen.getByText("в папке / с подпапками")).toBeVisible();
-    await userEvent.click(screen.getByRole("button", { name: /Topic/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Topic 2 / 3" }));
     expect(select).toHaveBeenCalledWith(child);
   });
 
@@ -68,17 +68,50 @@ describe("folder panel", () => {
     );
 
     const inboxItem = screen
-      .getByRole("button", { name: /Inbox/ })
+      .getByRole("button", { name: "Inbox 1 / 4" })
       .closest("li");
     const topicItem = screen
-      .getByRole("button", { name: /Topic/ })
+      .getByRole("button", { name: "Topic 2 / 3" })
       .closest("li");
     const nestedItem = screen
-      .getByRole("button", { name: /Nested/ })
+      .getByRole("button", { name: "Nested 0 / 0" })
       .closest("li");
 
     expect(inboxItem?.parentElement).toBe(topicItem?.parentElement);
     expect(nestedItem?.parentElement).toBe(topicItem?.querySelector("ul"));
+  });
+
+  it("toggles child folders separately from selecting the folder", async () => {
+    const select = vi.fn();
+    render(
+      <FolderPanel
+        root={root}
+        selectedId={root.id}
+        onSelect={select}
+        onChanged={vi.fn()}
+      />,
+    );
+
+    const collapse = screen.getByRole("button", {
+      name: "Свернуть папку Topic",
+    });
+    const branch = collapse.closest("li")?.querySelector(".folder-children");
+    expect(collapse).toHaveAttribute("aria-expanded", "true");
+
+    await userEvent.click(collapse);
+    expect(collapse).toHaveAttribute("aria-expanded", "false");
+    expect(branch).toHaveClass("collapsed");
+    expect(branch).toHaveAttribute("aria-hidden", "true");
+    expect(branch).toHaveAttribute("inert");
+
+    await userEvent.click(screen.getByRole("button", { name: "Topic 2 / 3" }));
+    expect(select).toHaveBeenCalledWith(child);
+    expect(branch).toHaveClass("collapsed");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Развернуть папку Topic" }),
+    );
+    expect(branch).not.toHaveClass("collapsed");
   });
 
   it("creates a trimmed child and preserves server field errors", async () => {

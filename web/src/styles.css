@@ -136,14 +136,44 @@ textarea[aria-invalid="true"] {
   width: 100%;
   min-height: 44px;
   margin: 2px 0;
-  padding: 8px 10px;
   display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  text-align: left;
+  align-items: center;
   background: transparent;
   color: #17213c;
   font-weight: 600;
+}
+.folder-node-toggle,
+.folder-node-decoration {
+  width: 52px;
+  min-height: 44px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 6px;
+}
+.folder-node-toggle,
+.folder-node-select,
+.folder-node-toggle:hover,
+.folder-node-select:hover {
+  margin: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+}
+.folder-node-select {
+  min-width: 0;
+  min-height: 44px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px 8px 0;
+  text-align: left;
+  font-weight: inherit;
 }
 .folder-node small {
   color: #66708a;
@@ -152,6 +182,22 @@ textarea[aria-invalid="true"] {
 .folder-node.selected {
   background: #e8edff;
   color: #264bc3;
+}
+.folder-children {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 180ms ease,
+    opacity 140ms ease;
+}
+.folder-children.collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.folder-children-clip {
+  min-height: 0;
+  overflow: hidden;
 }
 .folder-backdrop {
   display: none;
@@ -991,8 +1037,6 @@ h1 {
 
 .folder-node {
   min-height: 42px;
-  align-items: center;
-  padding: 7px 8px;
   border-radius: 11px;
   color: var(--ink);
   font-size: 0.9rem;
@@ -1021,12 +1065,6 @@ h1 {
 
 .folder-node-name {
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.folder-node-name > span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -1035,6 +1073,13 @@ h1 {
   width: 12px;
   color: var(--muted);
   font-size: 1rem;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform 180ms ease;
+}
+
+.tree-chevron.expanded {
+  transform: rotate(90deg);
 }
 
 .folder-icon {
