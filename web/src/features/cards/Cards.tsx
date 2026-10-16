@@ -294,7 +294,8 @@ function CardFields({
           id={side.id}
           autoFocus={side.id === "front"}
           tabIndex={active ? 0 : -1}
-          placeholder={side.placeholder}
+          rows={flippable ? 1 : undefined}
+          placeholder={flippable ? undefined : side.placeholder}
           value={values[side.id]}
           aria-invalid={!!errors[side.id]}
           onChange={(e) => setValues({ ...values, [side.id]: e.target.value })}

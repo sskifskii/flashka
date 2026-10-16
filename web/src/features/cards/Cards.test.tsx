@@ -217,6 +217,9 @@ describe("cards UI", () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole("textbox", { name: "Front" })).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Front" })).not.toHaveAttribute(
+      "placeholder",
+    );
     expect(
       screen.queryByRole("textbox", { name: "Back" }),
     ).not.toBeInTheDocument();

@@ -1332,6 +1332,8 @@ h1 {
 }
 
 .card-side-heading {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1382,8 +1384,33 @@ h1 {
 }
 
 .card-flip-face textarea {
-  height: 100%;
+  position: absolute;
+  top: 50%;
+  right: 30px;
+  left: 30px;
+  width: auto;
+  height: auto;
+  min-height: calc(1.45em + 16px);
+  max-height: calc(100% - 120px);
+  padding: 8px 12px;
+  overflow-y: auto;
+  border: 0;
+  background: transparent;
+  text-align: center;
   resize: none;
+  field-sizing: content;
+  transform: translateY(-50%);
+}
+
+.card-flip-face textarea:focus {
+  outline: none;
+}
+
+.card-flip-face > .field-error {
+  position: relative;
+  z-index: 1;
+  grid-row: 3;
+  align-self: end;
 }
 
 .card-side-field textarea::placeholder {
@@ -1910,9 +1937,11 @@ select {
   }
 
   .card-flip-face textarea {
-    min-height: 0;
-    padding: 10px 12px;
-    font-size: 1.15rem;
+    right: 16px;
+    left: 16px;
+    min-height: calc(1.45em + 16px);
+    padding: 8px 10px;
+    font-size: 1.35rem;
   }
 
   .study-run {
@@ -1979,6 +2008,11 @@ select {
 
   .card-flip-face {
     padding: 10px 14px;
+  }
+
+  .card-flip-face textarea {
+    right: 14px;
+    left: 14px;
   }
 
   .study-run-nav .study-scope-chip {
