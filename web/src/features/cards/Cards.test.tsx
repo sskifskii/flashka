@@ -216,38 +216,51 @@ describe("cards UI", () => {
         <NewCard />
       </MemoryRouter>,
     );
-    expect(screen.getByLabelText("Front")).toBeVisible();
-    expect(screen.queryByLabelText("Back")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Front" })).toBeVisible();
+    expect(
+      screen.queryByRole("textbox", { name: "Back" }),
+    ).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
-    expect(screen.getByText("Поле обязательно")).toBeVisible();
-    await userEvent.type(screen.getByLabelText("Front"), "front");
+    expect(
+      screen
+        .getByRole("textbox", { name: "Front" })
+        .closest(".card-side-field"),
+    ).toHaveTextContent("Поле обязательно");
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Front" }),
+      "front",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
 
-    expect(screen.queryByLabelText("Front")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Back")).toBeVisible();
-    expect(screen.getByLabelText("Back")).toHaveFocus();
-    expect(screen.getByText("Поле обязательно")).toBeVisible();
-    await userEvent.type(screen.getByLabelText("Back"), "back");
+    expect(
+      screen.queryByRole("textbox", { name: "Front" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Back" })).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Back" })).toHaveFocus();
+    expect(
+      screen.getByRole("textbox", { name: "Back" }).closest(".card-side-field"),
+    ).toHaveTextContent("Поле обязательно");
+    await userEvent.type(screen.getByRole("textbox", { name: "Back" }), "back");
     await userEvent.click(
       screen.getByRole("button", { name: "Развернуть на Front" }),
     );
-    expect(screen.getByLabelText("Front")).toHaveValue("front");
-    expect(screen.getByLabelText("Front")).toHaveFocus();
+    expect(screen.getByRole("textbox", { name: "Front" })).toHaveValue("front");
+    expect(screen.getByRole("textbox", { name: "Front" })).toHaveFocus();
     await userEvent.click(
       screen.getByRole("button", { name: "Развернуть на Back" }),
     );
-    expect(screen.getByLabelText("Back")).toHaveValue("back");
+    expect(screen.getByRole("textbox", { name: "Back" })).toHaveValue("back");
 
     await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Не удалось сохранить",
     );
-    expect(screen.getByLabelText("Back")).toHaveValue("back");
+    expect(screen.getByRole("textbox", { name: "Back" })).toHaveValue("back");
     await userEvent.click(
       screen.getByRole("button", { name: "Развернуть на Front" }),
     );
-    expect(screen.getByLabelText("Front")).toHaveValue("front");
+    expect(screen.getByRole("textbox", { name: "Front" })).toHaveValue("front");
   });
 
   it("renders text safely and requires explicit delete confirmation", async () => {

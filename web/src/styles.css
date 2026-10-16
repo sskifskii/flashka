@@ -733,6 +733,7 @@ button:disabled {
   * {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
@@ -755,6 +756,7 @@ button:disabled {
   --sage-soft: #e6efe2;
   --danger: #b82025;
   --danger-soft: #fbe8e7;
+  --card-flip-duration: 220ms;
   font-family: "Plus Jakarta Sans", Avenir, "Segoe UI", sans-serif;
   color: var(--ink);
   background: var(--canvas);
@@ -1295,9 +1297,38 @@ h1 {
     0 8px 24px rgba(39, 37, 34, 0.04);
 }
 
-.card-side-field.is-flippable {
+.card-flip-scene {
   min-height: min(420px, calc(100dvh - 260px));
-  grid-template-rows: auto minmax(160px, 1fr) auto;
+  perspective: 1000px;
+}
+
+.card-flip-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--card-flip-duration) ease-in-out;
+}
+
+.card-flip-card.show-back {
+  transform: rotateY(180deg);
+}
+
+.card-flip-face {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.card-flip-back {
+  transform: rotateY(180deg);
+}
+
+.card-flip-face[aria-hidden="true"] {
+  pointer-events: none;
 }
 
 .card-side-heading {
@@ -1350,7 +1381,7 @@ h1 {
   line-height: 1.45;
 }
 
-.card-side-field.is-flippable textarea {
+.card-flip-face textarea {
   height: 100%;
   resize: none;
 }
@@ -1863,12 +1894,14 @@ select {
     padding: 28px 32px;
   }
 
-  .card-side-field.is-flippable {
+  .card-flip-scene {
     min-height: 0;
     flex: 1 1 auto;
+  }
+
+  .card-flip-face {
     padding: 10px 16px;
     gap: 6px;
-    grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
   .card-side-field textarea {
@@ -1876,7 +1909,7 @@ select {
     font-size: 1.35rem;
   }
 
-  .card-side-field.is-flippable textarea {
+  .card-flip-face textarea {
     min-height: 0;
     padding: 10px 12px;
     font-size: 1.15rem;
@@ -1944,7 +1977,7 @@ select {
     padding: 24px 20px;
   }
 
-  .card-side-field.is-flippable {
+  .card-flip-face {
     padding: 10px 14px;
   }
 

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   Link,
   useNavigate,
@@ -248,6 +248,8 @@ function CardFields({
   activeSide?: CardSide;
   onFlip?: () => void;
 }) {
+  const frontRef = useRef<HTMLTextAreaElement>(null);
+  const backRef = useRef<HTMLTextAreaElement>(null);
   const sides: Array<{
     id: CardSide;
     label: string;
@@ -256,43 +258,65 @@ function CardFields({
     { id: "front", label: "Front", placeholder: "Слово, вопрос или фраза" },
     { id: "back", label: "Back", placeholder: "Ответ или пояснение" },
   ];
-  const visibleSides = activeSide
-    ? sides.filter((side) => side.id === activeSide)
-    : sides;
+  const flippable = activeSide !== undefined && onFlip !== undefined;
+
+  useEffect(() => {
+    if (!flippable || !activeSide) return;
+    (activeSide === "front" ? frontRef : backRef).current?.focus({
+      preventScroll: true,
+    });
+  }, [activeSide, flippable]);
+
+  const renderSide = (side: (typeof sides)[number]) => {
+    const active = !flippable || side.id === activeSide;
+    return (
+      <div
+        className={`card-side-field ${side.id}-side-field${flippable ? ` card-flip-face card-flip-${side.id}` : ""}`}
+        aria-hidden={flippable ? !active : undefined}
+        key={side.id}
+      >
+        <div className="card-side-heading">
+          <label htmlFor={side.id}>{side.label}</label>
+          {flippable && (
+            <button
+              type="button"
+              className="card-side-flip"
+              aria-label={`Развернуть на ${side.id === "front" ? "Back" : "Front"}`}
+              tabIndex={active ? 0 : -1}
+              onClick={onFlip}
+            >
+              <span aria-hidden="true">↻</span> Развернуть
+            </button>
+          )}
+        </div>
+        <textarea
+          ref={side.id === "front" ? frontRef : backRef}
+          id={side.id}
+          autoFocus={side.id === "front"}
+          tabIndex={active ? 0 : -1}
+          placeholder={side.placeholder}
+          value={values[side.id]}
+          aria-invalid={!!errors[side.id]}
+          onChange={(e) => setValues({ ...values, [side.id]: e.target.value })}
+        />
+        {errors[side.id] && <p className="field-error">{errors[side.id]}</p>}
+      </div>
+    );
+  };
 
   return (
     <>
-      {visibleSides.map((side) => (
-        <div
-          className={`card-side-field ${side.id}-side-field${onFlip ? " is-flippable" : ""}`}
-          key={side.id}
-        >
-          <div className="card-side-heading">
-            <label htmlFor={side.id}>{side.label}</label>
-            {onFlip && (
-              <button
-                type="button"
-                className="card-side-flip"
-                aria-label={`Развернуть на ${side.id === "front" ? "Back" : "Front"}`}
-                onClick={onFlip}
-              >
-                <span aria-hidden="true">↻</span> Развернуть
-              </button>
-            )}
+      {flippable ? (
+        <div className="card-flip-scene">
+          <div
+            className={`card-flip-card${activeSide === "back" ? " show-back" : ""}`}
+          >
+            {sides.map(renderSide)}
           </div>
-          <textarea
-            id={side.id}
-            autoFocus={side.id === (activeSide ?? "front")}
-            placeholder={side.placeholder}
-            value={values[side.id]}
-            aria-invalid={!!errors[side.id]}
-            onChange={(e) =>
-              setValues({ ...values, [side.id]: e.target.value })
-            }
-          />
-          {errors[side.id] && <p className="field-error">{errors[side.id]}</p>}
         </div>
-      ))}
+      ) : (
+        sides.map(renderSide)
+      )}
       {root && folderId && setFolderId && (
         <div className="folder-field">
           <label htmlFor="folder">Папка</label>
