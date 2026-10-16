@@ -2158,6 +2158,10 @@ select {
     position: relative;
   }
 
+  .shell:has(.collection) {
+    touch-action: pan-y pinch-zoom;
+  }
+
   .folder-toggle {
     position: fixed;
     left: 16px;

@@ -68,6 +68,7 @@ export function CardList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [loadedFolder, setLoadedFolder] = useState<string>();
+  const drawerSwipeStart = useRef<{ x: number; y: number } | null>(null);
   useEffect(() => {
     if (!foldersOpen) return;
 
@@ -82,6 +83,42 @@ export function CardList() {
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [foldersOpen]);
+  useEffect(() => {
+    drawerSwipeStart.current = null;
+    if (foldersOpen || !folders.root) return;
+
+    const startDrawerSwipe = (event: TouchEvent) => {
+      if (event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      drawerSwipeStart.current = { x: touch.clientX, y: touch.clientY };
+    };
+    const finishDrawerSwipe = (event: TouchEvent) => {
+      const start = drawerSwipeStart.current;
+      drawerSwipeStart.current = null;
+      const touch = event.changedTouches[0];
+      if (!start || !touch) return;
+      const distanceX = touch.clientX - start.x;
+      const distanceY = Math.abs(touch.clientY - start.y);
+      if (distanceX >= 72 && distanceY <= distanceX * 0.6) {
+        setFoldersOpen(true);
+      }
+    };
+    const cancelDrawerSwipe = () => {
+      drawerSwipeStart.current = null;
+    };
+
+    window.addEventListener("touchstart", startDrawerSwipe, { passive: true });
+    window.addEventListener("touchend", finishDrawerSwipe, { passive: true });
+    window.addEventListener("touchcancel", cancelDrawerSwipe, {
+      passive: true,
+    });
+    return () => {
+      drawerSwipeStart.current = null;
+      window.removeEventListener("touchstart", startDrawerSwipe);
+      window.removeEventListener("touchend", finishDrawerSwipe);
+      window.removeEventListener("touchcancel", cancelDrawerSwipe);
+    };
+  }, [folders.root, foldersOpen]);
   const load = async (next?: string) => {
     setLoading(true);
     setError("");

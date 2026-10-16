@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -187,6 +187,55 @@ describe("cards UI", () => {
     await userEvent.click(toggle);
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("opens one folder drawer with a right swipe from anywhere on the page", async () => {
+    vi.stubGlobal(
+      "fetch",
+      withTree(() => Promise.resolve(listResponse([], null))),
+    );
+    render(
+      <MemoryRouter>
+        <CardList />
+      </MemoryRouter>,
+    );
+
+    const page = await screen.findByText("Создайте первую карточку");
+
+    fireEvent.touchStart(page, {
+      touches: [{ clientX: 160, clientY: 120 }],
+    });
+    fireEvent.touchEnd(page, {
+      changedTouches: [{ clientX: 208, clientY: 122 }],
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.touchStart(page, {
+      touches: [{ clientX: 160, clientY: 120 }],
+    });
+    fireEvent.touchEnd(page, {
+      changedTouches: [{ clientX: 244, clientY: 210 }],
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.touchStart(page, {
+      touches: [{ clientX: 160, clientY: 120 }],
+    });
+    fireEvent.touchEnd(page, {
+      changedTouches: [{ clientX: 244, clientY: 128 }],
+    });
+    const drawer = screen.getByRole("dialog", { name: "Меню папок" });
+    expect(drawer).toBeVisible();
+
+    fireEvent.touchStart(drawer, {
+      touches: [{ clientX: 120, clientY: 120 }],
+    });
+    fireEvent.touchEnd(drawer, {
+      changedTouches: [{ clientX: 220, clientY: 124 }],
+    });
+    expect(screen.getAllByRole("dialog", { name: "Меню папок" })).toHaveLength(
+      1,
+    );
   });
 
   it("retries an initial list error and shows the successful result", async () => {
