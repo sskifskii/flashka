@@ -52,10 +52,12 @@ function TreeNode({
   node,
   selectedId,
   onSelect,
+  showChildren = true,
 }: {
   node: FolderNode;
   selectedId: string;
   onSelect: (node: FolderNode) => void;
+  showChildren?: boolean;
 }) {
   return (
     <li>
@@ -66,7 +68,7 @@ function TreeNode({
       >
         <span className="folder-node-name">
           <span className="tree-chevron" aria-hidden="true">
-            {node.children.length > 0 ? "⌄" : ""}
+            {showChildren && node.children.length > 0 ? "⌄" : ""}
           </span>
           <span className="folder-icon" aria-hidden="true" />
           <span>{node.name}</span>
@@ -75,7 +77,7 @@ function TreeNode({
           {node.directCardCount} / {node.totalCardCount}
         </small>
       </button>
-      {node.children.length > 0 && (
+      {showChildren && node.children.length > 0 && (
         <ul>
           {node.children.map((child) => (
             <TreeNode
@@ -167,7 +169,20 @@ export function FolderPanel({
         <span>в папке / с подпапками</span>
       </div>
       <ul className="folder-tree">
-        <TreeNode node={root} selectedId={selectedId} onSelect={onSelect} />
+        <TreeNode
+          node={root}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          showChildren={false}
+        />
+        {root.children.map((child) => (
+          <TreeNode
+            node={child}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            key={child.id}
+          />
+        ))}
       </ul>
       <div className="folder-actions">
         <button className="secondary" onClick={() => open("create")}>

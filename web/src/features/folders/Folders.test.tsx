@@ -7,6 +7,17 @@ import { FolderPanel } from "./Folders";
 afterEach(() => vi.unstubAllGlobals());
 
 const now = new Date().toISOString();
+const grandchild: FolderNode = {
+  id: "00000000-0000-4000-8000-000000000003",
+  parentId: "00000000-0000-4000-8000-000000000002",
+  name: "Nested",
+  isInbox: false,
+  directCardCount: 0,
+  totalCardCount: 0,
+  createdAt: now,
+  updatedAt: now,
+  children: [],
+};
 const child: FolderNode = {
   id: "00000000-0000-4000-8000-000000000002",
   parentId: "00000000-0000-4000-8000-000000000001",
@@ -16,7 +27,7 @@ const child: FolderNode = {
   totalCardCount: 3,
   createdAt: now,
   updatedAt: now,
-  children: [],
+  children: [grandchild],
 };
 const root: FolderNode = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -44,6 +55,30 @@ describe("folder panel", () => {
     expect(screen.getByText("в папке / с подпапками")).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: /Topic/ }));
     expect(select).toHaveBeenCalledWith(child);
+  });
+
+  it("shows Inbox beside top-level folders while preserving deeper nesting", () => {
+    render(
+      <FolderPanel
+        root={root}
+        selectedId={root.id}
+        onSelect={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+
+    const inboxItem = screen
+      .getByRole("button", { name: /Inbox/ })
+      .closest("li");
+    const topicItem = screen
+      .getByRole("button", { name: /Topic/ })
+      .closest("li");
+    const nestedItem = screen
+      .getByRole("button", { name: /Nested/ })
+      .closest("li");
+
+    expect(inboxItem?.parentElement).toBe(topicItem?.parentElement);
+    expect(nestedItem?.parentElement).toBe(topicItem?.querySelector("ul"));
   });
 
   it("creates a trimmed child and preserves server field errors", async () => {

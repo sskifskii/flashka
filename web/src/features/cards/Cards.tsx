@@ -68,6 +68,20 @@ export function CardList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [loadedFolder, setLoadedFolder] = useState<string>();
+  useEffect(() => {
+    if (!foldersOpen) return;
+
+    document.body.classList.add("folder-drawer-open");
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFoldersOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.classList.remove("folder-drawer-open");
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [foldersOpen]);
   const load = async (next?: string) => {
     setLoading(true);
     setError("");
@@ -153,14 +167,28 @@ export function CardList() {
         <ErrorBox message={folders.error} retry={() => void folders.load()} />
       )}
       {folders.root && (
-        <div className={foldersOpen ? "folder-drawer open" : "folder-drawer"}>
-          <FolderPanel
-            root={folders.root}
-            selectedId={selectedId}
-            onSelect={selectFolder}
-            onChanged={refreshFolders}
-          />
-        </div>
+        <>
+          {foldersOpen && (
+            <button
+              className="folder-backdrop"
+              aria-label="Закрыть меню папок"
+              onClick={() => setFoldersOpen(false)}
+            />
+          )}
+          <div
+            className={foldersOpen ? "folder-drawer open" : "folder-drawer"}
+            role={foldersOpen ? "dialog" : undefined}
+            aria-modal={foldersOpen ? "true" : undefined}
+            aria-label={foldersOpen ? "Меню папок" : undefined}
+          >
+            <FolderPanel
+              root={folders.root}
+              selectedId={selectedId}
+              onSelect={selectFolder}
+              onChanged={refreshFolders}
+            />
+          </div>
+        </>
       )}
       <div className="collection-cards">
         <div className="collection-header">

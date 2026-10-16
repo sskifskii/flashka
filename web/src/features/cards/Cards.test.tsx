@@ -163,6 +163,35 @@ describe("cards UI", () => {
     expect(screen.queryByText(/Коллекция.*Карточки/)).not.toBeInTheDocument();
   });
 
+  it("blocks the page behind the folder drawer and closes from its backdrop", async () => {
+    vi.stubGlobal(
+      "fetch",
+      withTree(() => Promise.resolve(listResponse([], null))),
+    );
+    render(
+      <MemoryRouter>
+        <CardList />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Создайте первую карточку");
+    const toggle = screen.getByRole("button", { name: "Показать папки" });
+    await userEvent.click(toggle);
+
+    expect(screen.getByRole("dialog", { name: "Меню папок" })).toBeVisible();
+    expect(document.body).toHaveClass("folder-drawer-open");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Закрыть меню папок" }),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.body).not.toHaveClass("folder-drawer-open");
+
+    await userEvent.click(toggle);
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("retries an initial list error and shows the successful result", async () => {
     const cardsMock = vi
       .fn()
