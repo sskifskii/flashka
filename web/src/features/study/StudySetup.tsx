@@ -63,7 +63,9 @@ export function StudySetup() {
   const actual = Math.min(count || 0, preview?.available ?? 0);
   return (
     <section className="content narrow study-setup">
-      <Link to="/app">← К карточкам</Link>
+      <Link className="back-link" to="/app">
+        ← К карточкам
+      </Link>
       <p className="eyebrow">Новый раунд</p>
       <h1>Что будем учить?</h1>
       <form className="study-form" onSubmit={submit}>

@@ -70,19 +70,34 @@ function Protected() {
 function Shell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [logoutPending, setLogoutPending] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const immersive =
+    /\/app\/study\/[^/]+$/.test(location.pathname) ||
+    location.pathname === "/app/cards/new";
   return (
-    <main className="shell">
-      <header>
-        <Link className="brand" to="/app">
-          Flashka
+    <main className={`shell ${immersive ? "immersive-shell" : ""}`}>
+      <header className="app-header">
+        <Link className="brand" to="/app" aria-label="Flashka — коллекция">
+          <span className="brand-mark" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span>Flashka</span>
         </Link>
-        <div>
-          <Link to="/app/study/active">Учиться</Link>
-          <span className="user-login">{user?.login}</span>
+        <div className="app-header-actions">
+          <Link className="header-study-link" to="/app/study/active">
+            Учиться
+          </Link>
+          <span className="user-login" title={user?.login}>
+            {user?.login}
+          </span>
           <button
-            className="secondary"
+            className="profile-button"
+            aria-label={logoutPending ? "Выходим…" : "Выйти"}
+            title={logoutPending ? "Выходим…" : "Выйти"}
             disabled={logoutPending}
             onClick={async () => {
               if (logoutPending) return;
@@ -100,7 +115,10 @@ function Shell() {
               }
             }}
           >
-            {logoutPending ? "Выходим…" : "Выйти"}
+            <span aria-hidden="true">{logoutPending ? "…" : "♙"}</span>
+            <span className="profile-button-label">
+              {logoutPending ? "Выходим…" : "Выйти"}
+            </span>
           </button>
         </div>
       </header>

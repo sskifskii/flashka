@@ -124,8 +124,10 @@ export function CardList() {
         className="folder-toggle secondary"
         onClick={() => setFoldersOpen((value) => !value)}
         aria-expanded={foldersOpen}
+        aria-label={foldersOpen ? "Скрыть папки" : "Показать папки"}
       >
-        {foldersOpen ? "Скрыть папки" : "Показать папки"}
+        <span aria-hidden="true">{foldersOpen ? "×" : "☰"}</span>
+        {foldersOpen ? "Закрыть папки" : "Папки"}
       </button>
       {folders.loading && !folders.root && (
         <div className="folder-loading">Загрузка папок…</div>
@@ -146,21 +148,22 @@ export function CardList() {
       <div className="collection-cards">
         <div className="title-row">
           <div>
-            <p className="eyebrow">{selected?.name ?? "Папка"}</p>
-            <h1>Карточки</h1>
+            <p className="eyebrow">Коллекция &nbsp;›&nbsp; Карточки</p>
+            <h1 aria-label="Карточки">{selected?.name ?? "Карточки"}</h1>
           </div>
           <div className="title-actions">
             <Link
               className="button-link secondary-link"
               to={`/app/study/new${requestedFolder ? `?folderId=${requestedFolder}` : ""}`}
             >
-              Учить
+              <span aria-hidden="true">▷</span> Учить
             </Link>
             <Link
               className="button-link"
+              aria-label="Добавить карточку"
               to={`/app/cards/new${requestedFolder ? `?folderId=${requestedFolder}` : ""}`}
             >
-              Добавить карточку
+              <span aria-hidden="true">＋</span> Карточка
             </Link>
           </div>
         </div>
@@ -198,7 +201,7 @@ export function CardList() {
                   {statusLabels[card.status]}
                 </small>
                 <strong>{card.front}</strong>
-                <span>{card.back}</span>
+                <span className="card-preview-back">{card.back}</span>
               </Link>
             ))}
           </div>
@@ -241,29 +244,39 @@ function CardFields({
 }) {
   return (
     <>
-      <label htmlFor="front">Лицевая сторона</label>
-      <textarea
-        id="front"
-        autoFocus
-        value={values.front}
-        aria-invalid={!!errors.front}
-        onChange={(e) => setValues({ ...values, front: e.target.value })}
-      />
-      {errors.front && <p className="field-error">{errors.front}</p>}
-      <label htmlFor="back">Обратная сторона</label>
-      <textarea
-        id="back"
-        value={values.back}
-        aria-invalid={!!errors.back}
-        onChange={(e) => setValues({ ...values, back: e.target.value })}
-      />
-      {errors.back && <p className="field-error">{errors.back}</p>}
+      <div className="card-side-field front-side-field">
+        <label htmlFor="front">
+          <span aria-hidden="true" /> Лицевая сторона
+        </label>
+        <textarea
+          id="front"
+          autoFocus
+          placeholder="Слово, вопрос или фраза"
+          value={values.front}
+          aria-invalid={!!errors.front}
+          onChange={(e) => setValues({ ...values, front: e.target.value })}
+        />
+        {errors.front && <p className="field-error">{errors.front}</p>}
+      </div>
+      <div className="card-side-field back-side-field">
+        <label htmlFor="back">
+          <span aria-hidden="true" /> Обратная сторона
+        </label>
+        <textarea
+          id="back"
+          placeholder="Ответ или пояснение"
+          value={values.back}
+          aria-invalid={!!errors.back}
+          onChange={(e) => setValues({ ...values, back: e.target.value })}
+        />
+        {errors.back && <p className="field-error">{errors.back}</p>}
+      </div>
       {root && folderId && setFolderId && (
-        <>
+        <div className="folder-field">
           <label htmlFor="folder">Папка</label>
           <FolderSelect root={root} value={folderId} onChange={setFolderId} />
           {errors.folderId && <p className="field-error">{errors.folderId}</p>}
-        </>
+        </div>
       )}
     </>
   );
@@ -335,18 +348,30 @@ export function NewCard() {
       </section>
     );
   return (
-    <section className="content narrow">
-      <Link to="/app">← К карточкам</Link>
-      <h1>Новая карточка</h1>
-      <form onSubmit={submit}>
-        <CardFields
-          values={values}
-          setValues={setValues}
-          errors={errors}
-          root={folders.root}
-          folderId={effectiveFolderId}
-          setFolderId={setFolderId}
-        />
+    <section className="content narrow card-editor-page">
+      <form className="card-editor-form" onSubmit={submit}>
+        <header className="card-editor-header">
+          <Link to="/app" className="editor-cancel">
+            <span aria-hidden="true">×</span> Отмена
+          </Link>
+          <h1>Новая карточка</h1>
+          <button disabled={pending}>
+            <span aria-hidden="true">✓</span>
+            {pending ? "Сохраняем…" : "Сохранить"}
+          </button>
+        </header>
+        {folders.root && (
+          <div className="folder-banner">
+            <span className="folder-icon" aria-hidden="true" />
+            <label htmlFor="folder">Папка:</label>
+            <FolderSelect
+              root={folders.root}
+              value={effectiveFolderId}
+              onChange={setFolderId}
+            />
+          </div>
+        )}
+        <CardFields values={values} setValues={setValues} errors={errors} />
         {folders.error && (
           <p className="form-error" role="alert">
             {folders.error} Новая карточка будет сохранена в Inbox.
@@ -357,9 +382,6 @@ export function NewCard() {
             {errors.form}
           </p>
         )}
-        <button disabled={pending}>
-          {pending ? "Сохраняем…" : "Сохранить"}
-        </button>
       </form>
     </section>
   );

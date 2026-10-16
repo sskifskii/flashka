@@ -196,10 +196,19 @@ export function StudySessionRun() {
 
   const current = session.current;
   const swipeLabel = drag > 20 ? "Вспомнил" : drag < -20 ? "Не вспомнил" : "";
+  const progress = Math.round(
+    ((current.position - 1) / session.actualCount) * 100,
+  );
   return (
     <section className="content narrow study-run">
       <div className="study-run-nav">
-        <Link to="/app">← Выйти и продолжить позже</Link>
+        <Link to="/app" aria-label="Выйти и продолжить позже">
+          <span aria-hidden="true">×</span>
+          <span className="study-exit-label">Выйти и продолжить позже</span>
+        </Link>
+        <span className="study-scope-chip">
+          <span className="folder-icon" aria-hidden="true" /> Учебная сессия
+        </span>
         <button
           className="danger-outline"
           disabled={pending}
@@ -219,9 +228,17 @@ export function StudySessionRun() {
           Прервать
         </button>
       </div>
-      <p className="study-progress" aria-label="Прогресс">
-        {current.position} / {session.actualCount}
-      </p>
+      <div className="study-progress-block">
+        <div className="study-progress-row">
+          <span>Повторение</span>
+          <p className="study-progress" aria-label="Прогресс">
+            {current.position} / {session.actualCount}
+          </p>
+        </div>
+        <div className="study-progress-track" aria-hidden="true">
+          <span style={{ width: `${progress}%` }} />
+        </div>
+      </div>
       <article
         className={`study-card ${drag > 20 ? "swipe-correct" : ""} ${drag < -20 ? "swipe-incorrect" : ""}`}
         onPointerDown={pointerDown}

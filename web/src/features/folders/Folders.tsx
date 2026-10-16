@@ -64,7 +64,13 @@ function TreeNode({
         aria-current={selectedId === node.id ? "page" : undefined}
         onClick={() => onSelect(node)}
       >
-        <span>{node.name}</span>
+        <span className="folder-node-name">
+          <span className="tree-chevron" aria-hidden="true">
+            {node.children.length > 0 ? "⌄" : ""}
+          </span>
+          <span className="folder-icon" aria-hidden="true" />
+          <span>{node.name}</span>
+        </span>
         <small>
           {node.directCardCount} / {node.totalCardCount}
         </small>
@@ -157,7 +163,7 @@ export function FolderPanel({
   return (
     <aside className="folder-panel" aria-label="Папки">
       <div className="folder-panel-title">
-        <strong>Папки</strong>
+        <strong>Коллекция</strong>
         <span>в папке / с подпапками</span>
       </div>
       <ul className="folder-tree">
@@ -165,7 +171,7 @@ export function FolderPanel({
       </ul>
       <div className="folder-actions">
         <button className="secondary" onClick={() => open("create")}>
-          Создать внутри
+          <span aria-hidden="true">＋</span> Создать внутри
         </button>
         {selected.id !== root.id && (
           <>
