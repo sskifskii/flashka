@@ -458,6 +458,7 @@ export function CardDetail() {
   const [folderId, setFolderId] = useState("");
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [activeSide, setActiveSide] = useState<CardSide>("front");
   const [pending, setPending] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -534,6 +535,7 @@ export function CardDetail() {
     );
     if (Object.keys(clean).length) {
       setErrors(clean);
+      setActiveSide(local.front ? "front" : "back");
       return;
     }
     setPending(true);
@@ -549,9 +551,11 @@ export function CardDetail() {
     } catch (e) {
       if (e instanceof RequestError && e.status === 404) {
         setNotFound(true);
-      } else if (e instanceof RequestError && e.body?.error.fields)
+      } else if (e instanceof RequestError && e.body?.error.fields) {
         setErrors(e.body.error.fields);
-      else if (!(e instanceof RequestError && e.status === 401))
+        if (e.body.error.fields.front) setActiveSide("front");
+        else if (e.body.error.fields.back) setActiveSide("back");
+      } else if (!(e instanceof RequestError && e.status === 401))
         setErrors({ form: "Не удалось сохранить изменения." });
     } finally {
       setPending(false);
@@ -573,92 +577,144 @@ export function CardDetail() {
       setPending(false);
     }
   };
+  const cancelEditing = () => {
+    setEditing(false);
+    setActiveSide("front");
+    setValues({ front: card.front, back: card.back });
+    setFolderId(card.folderId);
+    setErrors({});
+  };
+  const currentFolder = folders.root
+    ? flattenFolders(folders.root).find((folder) => folder.id === card.folderId)
+    : undefined;
   return (
-    <section className="content narrow">
-      <Link to="/app">← К карточкам</Link>
-      <h1>{editing ? "Редактирование" : "Карточка"}</h1>
+    <section
+      className={`content narrow ${editing ? "card-editor-page" : "card-detail-page"}`}
+    >
       {editing ? (
-        <form onSubmit={save}>
+        <form className="card-editor-form" onSubmit={save}>
+          <header className="card-editor-header">
+            <button
+              type="button"
+              className="editor-cancel editor-cancel-button"
+              onClick={cancelEditing}
+            >
+              <span aria-hidden="true">×</span> Отмена
+            </button>
+            <h1>Редактор</h1>
+            <button disabled={pending}>
+              <span aria-hidden="true">✓</span>
+              {pending ? "Сохраняем…" : "Сохранить"}
+            </button>
+          </header>
+          {folders.root && (
+            <div className="folder-banner">
+              <span className="folder-icon" aria-hidden="true" />
+              <label htmlFor="folder">Папка:</label>
+              <FolderSelect
+                root={folders.root}
+                value={folderId}
+                onChange={setFolderId}
+              />
+            </div>
+          )}
           <CardFields
             values={values}
             setValues={setValues}
             errors={errors}
-            root={folders.root}
-            folderId={folderId}
-            setFolderId={setFolderId}
+            activeSide={activeSide}
+            onFlip={() =>
+              setActiveSide((side) => (side === "front" ? "back" : "front"))
+            }
           />
           {errors.form && (
             <p className="form-error" role="alert">
               {errors.form}
             </p>
           )}
-          <div className="actions">
-            <button disabled={pending}>
-              {pending ? "Сохраняем…" : "Сохранить"}
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => {
-                setEditing(false);
-                setValues({ front: card.front, back: card.back });
-                setFolderId(card.folderId);
-                setErrors({});
-              }}
-            >
-              Отмена
-            </button>
-          </div>
         </form>
       ) : (
         <>
-          <article className="detail">
+          <nav className="card-detail-nav" aria-label="Навигация карточки">
+            <Link to="/app" className="back-link">
+              <span aria-hidden="true">←</span> К карточкам
+            </Link>
+            {currentFolder && (
+              <span className="card-folder-chip">
+                <span className="folder-icon" aria-hidden="true" />
+                {currentFolder.name}
+              </span>
+            )}
+          </nav>
+          <div className="card-detail-header">
+            <div>
+              <p className="eyebrow">Карточка</p>
+              <h1>Содержание</h1>
+            </div>
             <small className={`status-badge status-${card.status}`}>
               {statusLabels[card.status]}
             </small>
-            <div className="card-detail-side">
+          </div>
+          <article className="detail card-detail-content">
+            <section className="card-detail-side">
               <span className="card-side-label">Front</span>
               <p>{card.front}</p>
-            </div>
-            <div className="card-detail-side">
+            </section>
+            <section className="card-detail-side">
               <span className="card-side-label">Back</span>
               <p>{card.back}</p>
-            </div>
+            </section>
           </article>
-          <dl className="card-progress">
-            <div>
-              <dt>Правильных ответов</dt>
-              <dd>{card.correctCount}</dd>
-            </div>
-            <div>
-              <dt>Ошибок</dt>
-              <dd>{card.incorrectCount}</dd>
-            </div>
-            <div>
-              <dt>Текущая серия</dt>
-              <dd>{card.correctStreak}</dd>
-            </div>
-            <div>
-              <dt>Интервал</dt>
-              <dd>{card.intervalDays ? `${card.intervalDays} дн.` : "—"}</dd>
-            </div>
-            <div>
-              <dt>Последний ответ</dt>
-              <dd>{localDate(card.lastReviewedAt)}</dd>
-            </div>
-            <div>
-              <dt>Следующее повторение</dt>
-              <dd>{localDate(card.dueAt)}</dd>
-            </div>
-          </dl>
+          <section
+            className="card-statistics"
+            aria-labelledby="statistics-title"
+          >
+            <h2 id="statistics-title">Статистика</h2>
+            <dl className="card-progress">
+              <div>
+                <dt>Правильных ответов</dt>
+                <dd>{card.correctCount}</dd>
+              </div>
+              <div>
+                <dt>Ошибок</dt>
+                <dd>{card.incorrectCount}</dd>
+              </div>
+              <div>
+                <dt>Текущая серия</dt>
+                <dd>{card.correctStreak}</dd>
+              </div>
+              <div>
+                <dt>Интервал</dt>
+                <dd>{card.intervalDays ? `${card.intervalDays} дн.` : "—"}</dd>
+              </div>
+              <div>
+                <dt>Последний ответ</dt>
+                <dd>{localDate(card.lastReviewedAt)}</dd>
+              </div>
+              <div>
+                <dt>Следующее повторение</dt>
+                <dd>{localDate(card.dueAt)}</dd>
+              </div>
+            </dl>
+          </section>
           {errors.form && (
             <p className="form-error" role="alert">
               {errors.form}
             </p>
           )}
-          <div className="actions">
-            <button onClick={() => setEditing(true)}>Редактировать</button>
-            <button className="danger" onClick={() => setConfirming(true)}>
+          <div className="actions card-detail-actions">
+            <button
+              onClick={() => {
+                setActiveSide("front");
+                setEditing(true);
+              }}
+            >
+              Редактировать
+            </button>
+            <button
+              className="danger-outline"
+              onClick={() => setConfirming(true)}
+            >
               Удалить
             </button>
           </div>

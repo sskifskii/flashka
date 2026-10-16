@@ -312,4 +312,101 @@ describe("cards UI", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(cardsMock).toHaveBeenCalledOnce();
   });
+
+  it("edits a card with the same prefilled flip editor as creation", async () => {
+    const cardsMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        const body = JSON.parse(String(init.body)) as {
+          front: string;
+          back: string;
+        };
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              card: {
+                ...summary("00000000-0000-4000-8000-000000000001", body.front),
+                back: body.back,
+                folderId: "00000000-0000-4000-8000-000000000002",
+                correctCount: 0,
+                incorrectCount: 0,
+                correctStreak: 0,
+                intervalDays: null,
+                lastReviewedAt: null,
+                dueAt: null,
+              },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+      return Promise.resolve(cardResponse());
+    });
+    vi.stubGlobal("fetch", withTree(cardsMock));
+    render(
+      <MemoryRouter
+        initialEntries={["/app/cards/00000000-0000-4000-8000-000000000001"]}
+      >
+        <Routes>
+          <Route path="/app/cards/:id" element={<CardDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Статистика" }),
+    ).toBeVisible();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Редактировать" }),
+    );
+    expect(screen.getByRole("textbox", { name: "Front" })).toHaveValue("front");
+    expect(
+      screen.queryByRole("textbox", { name: "Back" }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.clear(screen.getByRole("textbox", { name: "Front" }));
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Front" }),
+      "draft",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Развернуть на Back" }),
+    );
+    expect(screen.getByRole("textbox", { name: "Back" })).toHaveValue(
+      "front back",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Отмена" }));
+    expect(screen.getByText("front", { exact: true })).toBeVisible();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Редактировать" }),
+    );
+    await userEvent.clear(screen.getByRole("textbox", { name: "Front" }));
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Front" }),
+      "updated front",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Развернуть на Back" }),
+    );
+    await userEvent.clear(screen.getByRole("textbox", { name: "Back" }));
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "Back" }),
+      "updated back",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+
+    expect(await screen.findByText("updated front")).toBeVisible();
+    expect(screen.getByText("updated back")).toBeVisible();
+    expect(cardsMock).toHaveBeenLastCalledWith(
+      "/api/v1/cards/00000000-0000-4000-8000-000000000001",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({
+          front: "updated front",
+          back: "updated back",
+          folderId: "00000000-0000-4000-8000-000000000002",
+        }),
+      }),
+    );
+  });
 });

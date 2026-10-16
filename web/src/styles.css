@@ -1190,7 +1190,8 @@ h1 {
   background-size: 200% 100%;
 }
 
-.immersive-shell > .app-header {
+.immersive-shell > .app-header,
+.shell:has(.card-editor-page) > .app-header {
   display: none;
 }
 
@@ -1232,6 +1233,20 @@ h1 {
   color: var(--muted);
 }
 
+.card-editor-header .editor-cancel-button {
+  min-height: 44px;
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-weight: 600;
+}
+
+.card-editor-header .editor-cancel-button:hover {
+  background: transparent;
+  color: var(--ink);
+}
+
 .editor-cancel span {
   font-size: 2rem;
   font-weight: 300;
@@ -1241,6 +1256,10 @@ h1 {
 .card-editor-header button {
   justify-self: end;
   min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 0 20px;
 }
 
@@ -1672,6 +1691,116 @@ select {
   border-top: 1px solid var(--line);
 }
 
+.card-detail-page {
+  max-width: 860px;
+}
+
+.card-detail-nav,
+.card-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.card-detail-nav {
+  min-height: 48px;
+}
+
+.card-detail-nav .back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-folder-chip {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--recessed);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.card-detail-header {
+  margin-top: 28px;
+}
+
+.card-detail-header .eyebrow,
+.card-detail-header h1 {
+  margin: 0;
+}
+
+.card-detail-header h1 {
+  margin-top: 5px;
+}
+
+.card-detail-content {
+  margin: 22px 0 38px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.card-detail-content .card-detail-side {
+  min-height: 220px;
+  align-content: center;
+  padding: 32px 40px;
+}
+
+.card-detail-content .card-detail-side + .card-detail-side {
+  padding-top: 32px;
+}
+
+.card-detail-content p {
+  max-width: 680px;
+  margin-inline: auto;
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+.card-statistics h2 {
+  margin: 0 0 16px;
+  font-size: 1.45rem;
+}
+
+.card-statistics .card-progress {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 30px;
+}
+
+.card-statistics .card-progress div {
+  min-height: 94px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 18px 20px;
+}
+
+.card-statistics .card-progress dd {
+  color: var(--ink);
+  font-family: Newsreader, Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 650;
+}
+
+.card-detail-actions {
+  padding-top: 2px;
+}
+
+.card-detail-actions button {
+  min-width: 160px;
+}
+
+.card-detail-actions .danger-outline {
+  min-width: 112px;
+  color: var(--danger);
+  border-color: rgba(167, 42, 62, 0.28);
+}
+
 .result-errors article {
   border-color: var(--line);
   background: var(--paper-strong);
@@ -1783,6 +1912,62 @@ select {
   .content {
     width: min(100% - 40px, 1180px);
     padding-top: 26px;
+  }
+
+  .card-detail-page {
+    width: min(100% - 32px, 860px);
+    padding-top: 18px;
+  }
+
+  .card-detail-nav {
+    min-height: 44px;
+  }
+
+  .card-folder-chip {
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .card-detail-header {
+    margin-top: 20px;
+  }
+
+  .card-detail-header h1 {
+    font-size: 1.95rem;
+    white-space: nowrap;
+  }
+
+  .card-detail-content {
+    margin: 18px 0 30px;
+  }
+
+  .card-detail-content .card-detail-side {
+    min-height: 180px;
+    padding: 26px 24px;
+  }
+
+  .card-detail-content .card-detail-side + .card-detail-side {
+    padding-top: 26px;
+  }
+
+  .card-statistics .card-progress {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-statistics .card-progress div {
+    min-height: 88px;
+    padding: 15px;
+  }
+
+  .card-detail-actions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+  }
+
+  .card-detail-actions button {
+    min-width: 0;
   }
 
   .card-editor-page {
