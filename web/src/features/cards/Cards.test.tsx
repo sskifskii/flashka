@@ -148,10 +148,7 @@ describe("cards UI", () => {
     expect(await screen.findByText("bonjour back")).toBeVisible();
     const heading = screen.getByRole("heading", { name: "Карточки" });
     expect(heading).toBeVisible();
-    expect(screen.getByRole("link", { name: "Inbox" })).toHaveAttribute(
-      "href",
-      "/app",
-    );
+    expect(within(heading).queryByText("Inbox")).not.toBeInTheDocument();
     expect(within(heading).getByText("Языки")).toHaveAttribute(
       "aria-current",
       "page",

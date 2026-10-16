@@ -135,9 +135,11 @@ export function CardList() {
   const selected = folders.root
     ? flattenFolders(folders.root).find((folder) => folder.id === selectedId)
     : undefined;
-  const selectedPath = folders.root
+  const fullSelectedPath = folders.root
     ? (findFolderPath(folders.root, selectedId) ?? [folders.root])
     : [];
+  const selectedPath =
+    fullSelectedPath.length > 1 ? fullSelectedPath.slice(1) : fullSelectedPath;
   const selectFolder = (node: FolderNode) => {
     setParams(node.isInbox ? {} : { folderId: node.id });
     setFoldersOpen(false);
