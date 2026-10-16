@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FolderNode } from "../../shared/api";
@@ -112,6 +112,93 @@ describe("folder panel", () => {
       screen.getByRole("button", { name: "Развернуть папку Topic" }),
     );
     expect(branch).not.toHaveClass("collapsed");
+  });
+
+  it("moves a folder by dropping it onto its new parent", async () => {
+    const changed = vi.fn().mockResolvedValue(undefined);
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ folder: grandchild }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <FolderPanel
+        root={root}
+        selectedId={child.id}
+        onSelect={vi.fn()}
+        onChanged={changed}
+      />,
+    );
+
+    const source = screen
+      .getByRole("button", { name: "Nested 0 / 0" })
+      .closest(".folder-node");
+    const target = screen
+      .getByRole("button", { name: "Inbox 1 / 4" })
+      .closest(".folder-node");
+    const values = new Map<string, string>();
+    const dataTransfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      setData: (type: string, value: string) => values.set(type, value),
+      getData: (type: string) => values.get(type) ?? "",
+    };
+
+    expect(source).toHaveAttribute("draggable", "true");
+    expect(target).toHaveAttribute("draggable", "false");
+    fireEvent.dragStart(source!, { dataTransfer });
+    fireEvent.dragEnter(target!, { dataTransfer });
+    fireEvent.dragOver(target!, { dataTransfer });
+    expect(target).toHaveClass("drop-target");
+    fireEvent.drop(target!, { dataTransfer });
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        `/api/v1/folders/${grandchild.id}`,
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ parentId: root.id }),
+        }),
+      ),
+    );
+    expect(changed).toHaveBeenCalledWith(child.id);
+  });
+
+  it("does not accept a folder dropped onto its own descendant", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <FolderPanel
+        root={root}
+        selectedId={root.id}
+        onSelect={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+
+    const source = screen
+      .getByRole("button", { name: "Topic 2 / 3" })
+      .closest(".folder-node");
+    const target = screen
+      .getByRole("button", { name: "Nested 0 / 0" })
+      .closest(".folder-node");
+    const values = new Map<string, string>();
+    const dataTransfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      setData: (type: string, value: string) => values.set(type, value),
+      getData: (type: string) => values.get(type) ?? "",
+    };
+
+    fireEvent.dragStart(source!, { dataTransfer });
+    fireEvent.dragEnter(target!, { dataTransfer });
+    fireEvent.dragOver(target!, { dataTransfer });
+    fireEvent.drop(target!, { dataTransfer });
+
+    expect(target).not.toHaveClass("drop-target");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("creates a trimmed child and preserves server field errors", async () => {

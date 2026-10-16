@@ -1,4 +1,11 @@
-import { FormEvent, useEffect, useId, useMemo, useState } from "react";
+import {
+  DragEvent,
+  FormEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+} from "react";
 import { api, FolderNode, RequestError } from "../../shared/api";
 import { normalizeFolderName, validateFolderName } from "./validation";
 
@@ -52,11 +59,27 @@ function TreeNode({
   node,
   selectedId,
   onSelect,
+  draggedId,
+  dropTargetId,
+  movePending,
+  canDropOn,
+  onDragTarget,
+  onDragStart,
+  onDragEnd,
+  onDrop,
   showChildren = true,
 }: {
   node: FolderNode;
   selectedId: string;
   onSelect: (node: FolderNode) => void;
+  draggedId: string | null;
+  dropTargetId: string | null;
+  movePending: boolean;
+  canDropOn: (targetId: string) => boolean;
+  onDragTarget: (targetId: string | null) => void;
+  onDragStart: (event: DragEvent<HTMLDivElement>, node: FolderNode) => void;
+  onDragEnd: () => void;
+  onDrop: (sourceId: string, targetId: string) => Promise<void>;
   showChildren?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -66,7 +89,43 @@ function TreeNode({
   return (
     <li>
       <div
-        className={`folder-node ${selectedId === node.id ? "selected" : ""}`}
+        className={`folder-node ${selectedId === node.id ? "selected" : ""} ${draggedId === node.id ? "dragging" : ""} ${dropTargetId === node.id ? "drop-target" : ""}`}
+        draggable={!node.isInbox && !movePending}
+        onDragStart={(event) => onDragStart(event, node)}
+        onDragEnd={onDragEnd}
+        onDragEnter={(event) => {
+          event.stopPropagation();
+          if (canDropOn(node.id)) {
+            setCollapsed(false);
+            onDragTarget(node.id);
+          } else {
+            onDragTarget(null);
+          }
+        }}
+        onDragOver={(event) => {
+          event.stopPropagation();
+          if (!canDropOn(node.id)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+          onDragTarget(node.id);
+        }}
+        onDragLeave={(event) => {
+          event.stopPropagation();
+          const next = event.relatedTarget;
+          if (!(next instanceof Node) || !event.currentTarget.contains(next)) {
+            onDragTarget(null);
+          }
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const sourceId =
+            event.dataTransfer.getData("application/x-flashka-folder-id") ||
+            draggedId;
+          if (sourceId && canDropOn(node.id)) {
+            void onDrop(sourceId, node.id);
+          }
+        }}
       >
         {hasChildren ? (
           <button
@@ -117,6 +176,14 @@ function TreeNode({
                   node={child}
                   selectedId={selectedId}
                   onSelect={onSelect}
+                  draggedId={draggedId}
+                  dropTargetId={dropTargetId}
+                  movePending={movePending}
+                  canDropOn={canDropOn}
+                  onDragTarget={onDragTarget}
+                  onDragStart={onDragStart}
+                  onDragEnd={onDragEnd}
+                  onDrop={onDrop}
                   key={child.id}
                 />
               ))}
@@ -148,6 +215,63 @@ export function FolderPanel({
   const [parentId, setParentId] = useState(root.id);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [movePending, setMovePending] = useState(false);
+  const [moveError, setMoveError] = useState("");
+  const nodes = useMemo(() => {
+    const byId = new Map<string, FolderNode>();
+    const visit = (node: FolderNode) => {
+      byId.set(node.id, node);
+      node.children.forEach(visit);
+    };
+    visit(root);
+    return byId;
+  }, [root]);
+  const canDropOn = (targetId: string) => {
+    if (!draggedId || movePending) return false;
+    const source = nodes.get(draggedId);
+    const target = nodes.get(targetId);
+    if (!source || source.isInbox || !target) return false;
+    if (source.id === target.id || source.parentId === target.id) return false;
+    const containsTarget = (node: FolderNode): boolean =>
+      node.children.some(
+        (child) => child.id === target.id || containsTarget(child),
+      );
+    return !containsTarget(source);
+  };
+  const finishDrag = () => {
+    setDraggedId(null);
+    setDropTargetId(null);
+  };
+  const startDrag = (event: DragEvent<HTMLDivElement>, node: FolderNode) => {
+    event.stopPropagation();
+    if (node.isInbox || movePending) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-flashka-folder-id", node.id);
+    setMoveError("");
+    setDraggedId(node.id);
+  };
+  const moveFolder = async (sourceId: string, targetId: string) => {
+    if (!canDropOn(targetId)) return;
+    setMovePending(true);
+    setMoveError("");
+    finishDrag();
+    try {
+      await api.updateFolder(sourceId, { parentId: targetId });
+      await onChanged(selectedId);
+    } catch (e) {
+      if (e instanceof RequestError && e.body?.error.message)
+        setMoveError(e.body.error.message);
+      else if (!(e instanceof RequestError && e.status === 401))
+        setMoveError("Не удалось переместить папку. Попробуйте ещё раз.");
+    } finally {
+      setMovePending(false);
+    }
+  };
   const open = (next: Action) => {
     setAction(next);
     setError("");
@@ -208,6 +332,14 @@ export function FolderPanel({
           node={root}
           selectedId={selectedId}
           onSelect={onSelect}
+          draggedId={draggedId}
+          dropTargetId={dropTargetId}
+          movePending={movePending}
+          canDropOn={canDropOn}
+          onDragTarget={setDropTargetId}
+          onDragStart={startDrag}
+          onDragEnd={finishDrag}
+          onDrop={moveFolder}
           showChildren={false}
         />
         {root.children.map((child) => (
@@ -215,10 +347,23 @@ export function FolderPanel({
             node={child}
             selectedId={selectedId}
             onSelect={onSelect}
+            draggedId={draggedId}
+            dropTargetId={dropTargetId}
+            movePending={movePending}
+            canDropOn={canDropOn}
+            onDragTarget={setDropTargetId}
+            onDragStart={startDrag}
+            onDragEnd={finishDrag}
+            onDrop={moveFolder}
             key={child.id}
           />
         ))}
       </ul>
+      {moveError && (
+        <p className="field-error folder-move-error" role="alert">
+          {moveError}
+        </p>
+      )}
       <div className="folder-actions">
         <button className="secondary" onClick={() => open("create")}>
           <span aria-hidden="true">＋</span> Создать внутри
