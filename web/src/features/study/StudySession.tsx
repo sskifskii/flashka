@@ -7,6 +7,7 @@ import {
 } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { api, RequestError, type StudySessionState } from "../../shared/api";
+import { createRequestId } from "../../shared/requestId";
 
 type Rating = "correct" | "incorrect";
 
@@ -118,7 +119,7 @@ export function StudySessionRun() {
           session.id,
           position,
           rating,
-          crypto.randomUUID(),
+          createRequestId(),
         );
         setSession(data.session);
       } catch (e) {

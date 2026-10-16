@@ -100,6 +100,72 @@ it("hides the back until reveal and answers by keyboard", async () => {
   );
 });
 
+it("answers when randomUUID is unavailable on an insecure origin", async () => {
+  const sessionId = crypto.randomUUID();
+  const cardId = crypto.randomUUID();
+  const getRandomValues = crypto.getRandomValues.bind(crypto);
+  vi.stubGlobal("crypto", { getRandomValues });
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          session: {
+            id: sessionId,
+            actualCount: 1,
+            answeredCount: 0,
+            status: "active",
+            current: {
+              position: 1,
+              cardId,
+              front: "Вопрос",
+              back: "Ответ",
+              revealed: true,
+            },
+          },
+        }),
+        { status: 200 },
+      ),
+    )
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          session: {
+            id: sessionId,
+            actualCount: 1,
+            answeredCount: 1,
+            status: "completed",
+            current: null,
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+  vi.stubGlobal("fetch", fetchMock);
+  render(
+    <MemoryRouter initialEntries={[`/app/study/${sessionId}`]}>
+      <Routes>
+        <Route path="/app/study/:id" element={<StudySessionRun />} />
+        <Route path="/app/study/:id/result" element={<div>Итог раунда</div>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByText("Ответ")).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: "Вспомнил →" }));
+  expect(await screen.findByText("Итог раунда")).toBeVisible();
+
+  const request = fetchMock.mock.calls[1]?.[1] as RequestInit;
+  const body = JSON.parse(String(request.body)) as {
+    rating: string;
+    requestId: string;
+  };
+  expect(body.rating).toBe("correct");
+  expect(body.requestId).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+  );
+});
+
 it("keeps the revealed card when saving an answer fails", async () => {
   const sessionId = crypto.randomUUID();
   const fetchMock = vi
