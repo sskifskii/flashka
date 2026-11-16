@@ -121,7 +121,7 @@ Vite доступен на `http://localhost:5173` и проксирует API �
 
 Для E2E установите браузер: `cd web && npx playwright install --with-deps chromium`,
 затем выполните `make test-e2e` из корня с доступной тестовой БД и миграциями.
-Playwright сам запускает backend, если сервер ещё не работает.
+Playwright запускает отдельный backend на порту `18080`; порт должен быть свободен.
 Полный набор проверок также настроен в [GitHub Actions](.github/workflows/ci.yml).
 
 ## Участие

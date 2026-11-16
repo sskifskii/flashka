@@ -1,14 +1,17 @@
 import { defineConfig, devices } from "@playwright/test";
+const baseURL = "http://localhost:18080";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
   webServer: {
     command: "cd .. && go run ./cmd/server",
-    url: "http://localhost:8080/health/ready",
-    reuseExistingServer: true,
+    url: `${baseURL}/health/ready`,
+    reuseExistingServer: false,
+    env: { HTTP_ADDR: ":18080", TRUSTED_ORIGIN: baseURL },
     timeout: 120_000,
   },
-  use: { baseURL: "http://localhost:8080", trace: "retain-on-failure" },
+  use: { baseURL, trace: "retain-on-failure" },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
     {
