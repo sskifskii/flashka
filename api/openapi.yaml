@@ -1,0 +1,745 @@
+openapi: 3.1.0
+info:
+  title: Flashka API
+  version: 0.1.0
+  license: { name: MIT, identifier: MIT }
+servers:
+  - url: /
+paths:
+  /api/v1/auth/register:
+    post:
+      summary: Register a user and start a session
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Credentials" }
+      responses:
+        "201": { $ref: "#/components/responses/RegisterCreated" }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/auth/login:
+    post:
+      summary: Start a session with login and password
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Credentials" }
+      responses:
+        "200": { $ref: "#/components/responses/LoginSucceeded" }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/AuthError" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "429": { $ref: "#/components/responses/LoginRateLimited" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/auth/logout:
+    post:
+      summary: End the current browser session
+      operationId: logout
+      security: []
+      responses:
+        "204": { $ref: "#/components/responses/LogoutSucceeded" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/auth/me:
+    get:
+      summary: Get the current authenticated user
+      operationId: currentUser
+      responses:
+        "200": { $ref: "#/components/responses/CurrentUser" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/folders/tree:
+    get:
+      summary: Read the current user's complete folder tree and card counts
+      operationId: getFolderTree
+      responses:
+        "200":
+          description: Complete tree rooted at Inbox.
+          content: { application/json: { schema: { $ref: "#/components/schemas/FolderTreeEnvelope" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/folders:
+    post:
+      summary: Create a child folder
+      operationId: createFolder
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/FolderCreate" } } }
+      responses:
+        "201":
+          description: Folder created.
+          content: { application/json: { schema: { $ref: "#/components/schemas/FolderEnvelope" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/folders/{folderId}:
+    parameters:
+      - { name: folderId, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      summary: Rename or move an owned non-Inbox folder
+      operationId: updateFolder
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/FolderPatch" } } }
+      responses:
+        "200":
+          description: Folder updated.
+          content: { application/json: { schema: { $ref: "#/components/schemas/FolderEnvelope" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+    delete:
+      summary: Delete an empty owned non-Inbox folder
+      operationId: deleteFolder
+      responses:
+        "204": { description: Empty folder deleted; response has no body. }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/cards:
+    get:
+      summary: List cards directly in an owned folder, defaulting to Inbox
+      operationId: listCards
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - { name: folderId, in: query, description: Owned folder; Inbox when omitted., schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Stable page ordered by creation time and UUID descending.
+          content: { application/json: { schema: { $ref: "#/components/schemas/CardList" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+    post:
+      summary: Create a card in an owned folder, defaulting to Inbox
+      operationId: createCard
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/CardCreate" } } }
+      responses:
+        "201":
+          description: Card created.
+          content: { application/json: { schema: { $ref: "#/components/schemas/CardEnvelope" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/cards/{cardId}:
+    parameters:
+      - { name: cardId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read one owned card
+      operationId: getCard
+      responses:
+        "200":
+          description: Card found.
+          content: { application/json: { schema: { $ref: "#/components/schemas/CardEnvelope" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+    patch:
+      summary: Update text and/or move an owned card
+      operationId: updateCard
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/CardPatch" } } }
+      responses:
+        "200":
+          description: Card updated without changing its scheduling aggregates.
+          content: { application/json: { schema: { $ref: "#/components/schemas/CardEnvelope" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+    delete:
+      summary: Permanently delete an owned card
+      operationId: deleteCard
+      responses:
+        "204": { description: Card deleted; response has no body. }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/preview:
+    get:
+      summary: Preview the current scheduling counts for a study scope
+      operationId: previewStudySession
+      parameters:
+        - { name: scopeType, in: query, required: true, schema: { type: string, enum: [all, folder] } }
+        - { name: folderId, in: query, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Counts at the server's current UTC time; mastered may overlap due.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudyPreviewEnvelope" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions:
+    post:
+      summary: Atomically create an ordered fixed study session
+      operationId: createStudySession
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/StudySessionCreate" } } }
+      responses:
+        "201":
+          description: Session and its selected positions were created atomically.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudySessionEnvelope" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions/active:
+    get:
+      summary: Get the newest active study session for continuation
+      operationId: getActiveStudySession
+      responses:
+        "200":
+          description: Active session at its first unanswered position.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudySessionStateEnvelope" } } }
+        "204": { description: There is no active session. }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions/{sessionId}:
+    parameters:
+      - { $ref: "#/components/parameters/StudySessionID" }
+    get:
+      summary: Get study session progress and its first unanswered position
+      operationId: getStudySession
+      responses:
+        "200":
+          description: Current session state; the back is null until reveal.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudySessionStateEnvelope" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions/{sessionId}/result:
+    parameters:
+      - { $ref: "#/components/parameters/StudySessionID" }
+    get:
+      summary: Get the totals and surviving incorrect cards for a completed session
+      operationId: getStudySessionResult
+      responses:
+        "200":
+          description: Completed session result; deleted cards are omitted from errors.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudyResultEnvelope" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions/{sessionId}/cards/{position}/reveal:
+    parameters:
+      - { $ref: "#/components/parameters/StudySessionID" }
+      - { $ref: "#/components/parameters/StudyPositionNumber" }
+    post:
+      summary: Idempotently reveal the current study position
+      operationId: revealStudyPosition
+      responses:
+        "200":
+          description: Current position with its back revealed.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudySessionStateEnvelope" } } }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions/{sessionId}/cards/{position}/answer:
+    parameters:
+      - { $ref: "#/components/parameters/StudySessionID" }
+      - { $ref: "#/components/parameters/StudyPositionNumber" }
+    put:
+      summary: Idempotently answer the current revealed study position
+      operationId: answerStudyPosition
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/StudyAnswer" } } }
+      responses:
+        "200":
+          description: Persisted state at the next position or completed session.
+          content: { application/json: { schema: { $ref: "#/components/schemas/StudySessionStateEnvelope" } } }
+        "400": { $ref: "#/components/responses/AuthError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "422": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /api/v1/study/sessions/{sessionId}/abandon:
+    parameters:
+      - { $ref: "#/components/parameters/StudySessionID" }
+    post:
+      summary: Mark an active study session as abandoned
+      operationId: abandonStudySession
+      responses:
+        "204": { description: Session abandoned; prior answers remain saved. }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/AuthError" }
+        "404": { $ref: "#/components/responses/AuthError" }
+        "409": { $ref: "#/components/responses/AuthError" }
+        "500": { $ref: "#/components/responses/AuthError" }
+  /health/live:
+    get:
+      summary: Check whether the HTTP process is alive
+      operationId: liveness
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/HealthOK" }
+  /health/ready:
+    get:
+      summary: Check whether PostgreSQL is ready
+      operationId: readiness
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/HealthOK" }
+        "503": { $ref: "#/components/responses/HealthError" }
+components:
+  parameters:
+    StudySessionID:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    StudyPositionNumber:
+      name: position
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+  securitySchemes:
+    sessionCookie: { type: apiKey, in: cookie, name: flashka_session }
+  headers:
+    RequestID:
+      description: Server-generated request identifier; client values are ignored.
+      schema: { type: string, format: uuid }
+    NoStore:
+      description: Authentication responses must not be cached.
+      schema: { type: string, const: no-store }
+    NoSniff: { schema: { type: string, const: nosniff } }
+    NoReferrer: { schema: { type: string, const: no-referrer } }
+    ContentSecurityPolicy:
+      description: Restrictive same-origin content security policy.
+      schema: { type: string }
+    PermissionsPolicy:
+      description: Disables unused browser capabilities.
+      schema: { type: string }
+    HSTS:
+      description: Present only in production HTTPS responses.
+      schema: { type: string }
+    SessionCookie:
+      description: HttpOnly, SameSite=Lax session cookie; Secure in production.
+      schema: { type: string }
+    ClearSessionCookie:
+      description: Clears the current session cookie with the same attributes.
+      schema: { type: string }
+  schemas:
+    Credentials:
+      type: object
+      additionalProperties: false
+      required: [login, password]
+      properties:
+        login: { type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{2,31}$" }
+        password: { type: string, minLength: 8, maxLength: 128, writeOnly: true }
+    User:
+      type: object
+      additionalProperties: false
+      required: [id, login]
+      properties:
+        id: { type: string, format: uuid }
+        login: { type: string }
+    UserEnvelope:
+      type: object
+      additionalProperties: false
+      required: [user]
+      properties:
+        user: { $ref: "#/components/schemas/User" }
+    APIError:
+      type: object
+      additionalProperties: false
+      required: [code, message, requestId]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        requestId: { type: string, format: uuid }
+        fields: { type: object, additionalProperties: { type: string } }
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error: { $ref: "#/components/schemas/APIError" }
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, const: ok }
+    CardSide:
+      type: string
+      minLength: 1
+      maxLength: 2000
+      description: Plain text trimmed only at its Unicode White_Space edges.
+    CardCreate:
+      type: object
+      additionalProperties: false
+      required: [front, back]
+      properties:
+        front: { $ref: "#/components/schemas/CardSide" }
+        back: { $ref: "#/components/schemas/CardSide" }
+        folderId: { type: string, format: uuid, description: Defaults to Inbox when omitted. }
+    CardPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        front: { $ref: "#/components/schemas/CardSide" }
+        back: { $ref: "#/components/schemas/CardSide" }
+        folderId: { type: string, format: uuid }
+    CardSummary:
+      type: object
+      additionalProperties: false
+      required: [id, front, back, status, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        front: { $ref: "#/components/schemas/CardSide" }
+        back: { $ref: "#/components/schemas/CardSide" }
+        status: { $ref: "#/components/schemas/CardProgressStatus" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Card:
+      type: object
+      additionalProperties: false
+      required: [id, folderId, front, back, correctCount, incorrectCount, correctStreak, intervalDays, lastReviewedAt, dueAt, status, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        folderId: { type: string, format: uuid }
+        front: { $ref: "#/components/schemas/CardSide" }
+        back: { $ref: "#/components/schemas/CardSide" }
+        correctCount: { type: integer, minimum: 0 }
+        incorrectCount: { type: integer, minimum: 0 }
+        correctStreak: { type: integer, minimum: 0 }
+        intervalDays: { type: [integer, "null"], minimum: 1 }
+        lastReviewedAt: { type: [string, "null"], format: date-time }
+        dueAt: { type: [string, "null"], format: date-time }
+        status: { $ref: "#/components/schemas/CardProgressStatus" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CardEnvelope:
+      type: object
+      additionalProperties: false
+      required: [card]
+      properties:
+        card: { $ref: "#/components/schemas/Card" }
+    CardProgressStatus:
+      type: string
+      enum: [new, learning, due, mastered]
+      description: Server-calculated status at the current UTC time.
+    CardList:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/CardSummary" } }
+        nextCursor: { type: [string, "null"] }
+    FolderName:
+      type: string
+      minLength: 1
+      maxLength: 80
+      description: Trimmed at Unicode White_Space edges and unique case-insensitively among siblings.
+    Folder:
+      type: object
+      additionalProperties: false
+      required: [id, parentId, name, isInbox, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        parentId: { type: string, format: uuid }
+        name: { $ref: "#/components/schemas/FolderName" }
+        isInbox: { type: boolean, const: false }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    FolderNode:
+      type: object
+      additionalProperties: false
+      required: [id, parentId, name, isInbox, directCardCount, totalCardCount, createdAt, updatedAt, children]
+      properties:
+        id: { type: string, format: uuid }
+        parentId: { type: [string, "null"], format: uuid }
+        name: { $ref: "#/components/schemas/FolderName" }
+        isInbox: { type: boolean }
+        directCardCount: { type: integer, minimum: 0 }
+        totalCardCount: { type: integer, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        children: { type: array, items: { $ref: "#/components/schemas/FolderNode" } }
+    FolderCreate:
+      type: object
+      additionalProperties: false
+      required: [parentId, name]
+      properties:
+        parentId: { type: string, format: uuid }
+        name: { $ref: "#/components/schemas/FolderName" }
+    FolderPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        parentId: { type: string, format: uuid }
+        name: { $ref: "#/components/schemas/FolderName" }
+    FolderEnvelope:
+      type: object
+      additionalProperties: false
+      required: [folder]
+      properties:
+        folder: { $ref: "#/components/schemas/Folder" }
+    FolderTreeEnvelope:
+      type: object
+      additionalProperties: false
+      required: [root]
+      properties:
+        root: { $ref: "#/components/schemas/FolderNode" }
+    StudyPreview:
+      type: object
+      additionalProperties: false
+      required: [available, due, new, mastered]
+      properties:
+        available: { type: integer, minimum: 0 }
+        due: { type: integer, minimum: 0 }
+        new: { type: integer, minimum: 0 }
+        mastered: { type: integer, minimum: 0 }
+    StudyPreviewEnvelope:
+      type: object
+      additionalProperties: false
+      required: [preview]
+      properties:
+        preview: { $ref: "#/components/schemas/StudyPreview" }
+    StudySessionCreate:
+      type: object
+      additionalProperties: false
+      required: [scopeType, count]
+      properties:
+        scopeType: { type: string, enum: [all, folder] }
+        folderId: { type: string, format: uuid }
+        count: { type: integer, minimum: 1, maximum: 100 }
+    StudyPosition:
+      type: object
+      additionalProperties: false
+      required: [position, cardId, front]
+      properties:
+        position: { type: integer, minimum: 1 }
+        cardId: { type: string, format: uuid }
+        front: { $ref: "#/components/schemas/CardSide" }
+    StudySession:
+      type: object
+      additionalProperties: false
+      required: [id, scopeType, scopeFolderId, requestedCount, actualCount, status, createdAt, first]
+      properties:
+        id: { type: string, format: uuid }
+        scopeType: { type: string, enum: [all, folder] }
+        scopeFolderId: { type: [string, "null"], format: uuid }
+        requestedCount: { type: integer, minimum: 1, maximum: 100 }
+        actualCount: { type: integer, minimum: 1, maximum: 100 }
+        status: { type: string, const: active }
+        createdAt: { type: string, format: date-time }
+        first: { $ref: "#/components/schemas/StudyPosition" }
+    StudySessionEnvelope:
+      type: object
+      additionalProperties: false
+      required: [session]
+      properties:
+        session: { $ref: "#/components/schemas/StudySession" }
+    StudyCurrentPosition:
+      type: object
+      additionalProperties: false
+      required: [position, cardId, front, back, revealed]
+      properties:
+        position: { type: integer, minimum: 1 }
+        cardId: { type: string, format: uuid }
+        front: { $ref: "#/components/schemas/CardSide" }
+        back: { anyOf: [{ $ref: "#/components/schemas/CardSide" }, { type: "null" }] }
+        revealed: { type: boolean }
+    StudySessionState:
+      type: object
+      additionalProperties: false
+      required: [id, actualCount, answeredCount, status, current]
+      properties:
+        id: { type: string, format: uuid }
+        actualCount: { type: integer, minimum: 1, maximum: 100 }
+        answeredCount: { type: integer, minimum: 0, maximum: 100 }
+        status: { type: string, enum: [active, completed, abandoned] }
+        current:
+          anyOf:
+            - { $ref: "#/components/schemas/StudyCurrentPosition" }
+            - { type: "null" }
+    StudySessionStateEnvelope:
+      type: object
+      additionalProperties: false
+      required: [session]
+      properties:
+        session: { $ref: "#/components/schemas/StudySessionState" }
+    StudyResultError:
+      type: object
+      additionalProperties: false
+      required: [cardId, front, back]
+      properties:
+        cardId: { type: string, format: uuid }
+        front: { $ref: "#/components/schemas/CardSide" }
+        back: { $ref: "#/components/schemas/CardSide" }
+    StudyResult:
+      type: object
+      additionalProperties: false
+      required: [id, scopeType, scopeFolderId, actualCount, correctCount, incorrectCount, correctPercent, errors]
+      properties:
+        id: { type: string, format: uuid }
+        scopeType: { type: string, enum: [all, folder] }
+        scopeFolderId: { type: [string, "null"], format: uuid }
+        actualCount: { type: integer, minimum: 1, maximum: 100 }
+        correctCount: { type: integer, minimum: 0, maximum: 100 }
+        incorrectCount: { type: integer, minimum: 0, maximum: 100 }
+        correctPercent: { type: integer, minimum: 0, maximum: 100 }
+        errors: { type: array, items: { $ref: "#/components/schemas/StudyResultError" } }
+    StudyResultEnvelope:
+      type: object
+      additionalProperties: false
+      required: [result]
+      properties:
+        result: { $ref: "#/components/schemas/StudyResult" }
+    StudyAnswer:
+      type: object
+      additionalProperties: false
+      required: [rating, requestId]
+      properties:
+        rating: { type: string, enum: [correct, incorrect] }
+        requestId: { type: string, format: uuid }
+  responses:
+    RegisterCreated:
+      description: User, Inbox and session were created atomically.
+      headers:
+        Set-Cookie: { $ref: "#/components/headers/SessionCookie" }
+        X-Request-ID: { $ref: "#/components/headers/RequestID" }
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        Content-Security-Policy: { $ref: "#/components/headers/ContentSecurityPolicy" }
+        Permissions-Policy: { $ref: "#/components/headers/PermissionsPolicy" }
+        Strict-Transport-Security: { $ref: "#/components/headers/HSTS" }
+      content: { application/json: { schema: { $ref: "#/components/schemas/UserEnvelope" } } }
+    LoginSucceeded:
+      description: A new independent session was created.
+      headers:
+        Set-Cookie: { $ref: "#/components/headers/SessionCookie" }
+        X-Request-ID: { $ref: "#/components/headers/RequestID" }
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        Content-Security-Policy: { $ref: "#/components/headers/ContentSecurityPolicy" }
+        Permissions-Policy: { $ref: "#/components/headers/PermissionsPolicy" }
+        Strict-Transport-Security: { $ref: "#/components/headers/HSTS" }
+      content: { application/json: { schema: { $ref: "#/components/schemas/UserEnvelope" } } }
+    CurrentUser:
+      description: Current user. This response never rotates the cookie.
+      headers:
+        X-Request-ID: { $ref: "#/components/headers/RequestID" }
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        Content-Security-Policy: { $ref: "#/components/headers/ContentSecurityPolicy" }
+        Permissions-Policy: { $ref: "#/components/headers/PermissionsPolicy" }
+        Strict-Transport-Security: { $ref: "#/components/headers/HSTS" }
+      content: { application/json: { schema: { $ref: "#/components/schemas/UserEnvelope" } } }
+    LogoutSucceeded:
+      description: Current session is absent and its cookie is cleared.
+      headers:
+        Set-Cookie: { $ref: "#/components/headers/ClearSessionCookie" }
+        X-Request-ID: { $ref: "#/components/headers/RequestID" }
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        Content-Security-Policy: { $ref: "#/components/headers/ContentSecurityPolicy" }
+        Permissions-Policy: { $ref: "#/components/headers/PermissionsPolicy" }
+        Strict-Transport-Security: { $ref: "#/components/headers/HSTS" }
+    AuthError:
+      description: Authentication request error.
+      headers:
+        X-Request-ID: { $ref: "#/components/headers/RequestID" }
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        Content-Security-Policy: { $ref: "#/components/headers/ContentSecurityPolicy" }
+        Permissions-Policy: { $ref: "#/components/headers/PermissionsPolicy" }
+        Strict-Transport-Security: { $ref: "#/components/headers/HSTS" }
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } }
+    Unauthenticated:
+      description: No valid session. Set-Cookie is present only when an invalid, unknown or expired cookie is cleared; it is absent when no cookie was sent.
+      headers:
+        Set-Cookie: { $ref: "#/components/headers/ClearSessionCookie" }
+        X-Request-ID: { $ref: "#/components/headers/RequestID" }
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        Content-Security-Policy: { $ref: "#/components/headers/ContentSecurityPolicy" }
+        Permissions-Policy: { $ref: "#/components/headers/PermissionsPolicy" }
+        Strict-Transport-Security: { $ref: "#/components/headers/HSTS" }
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } }
+    LoginRateLimited:
+      description: Too many failed login attempts for the IP and normalized login.
+      headers:
+        Retry-After: { schema: { type: integer, minimum: 1 } }
+        X-Request-ID: { $ref: "#/components/headers/RequestID" }
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        Content-Security-Policy: { $ref: "#/components/headers/ContentSecurityPolicy" }
+        Permissions-Policy: { $ref: "#/components/headers/PermissionsPolicy" }
+        Strict-Transport-Security: { $ref: "#/components/headers/HSTS" }
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } }
+    HealthOK:
+      description: Process or dependency is ready.
+      headers:
+        X-Request-ID: { $ref: "#/components/headers/RequestID" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        Content-Security-Policy: { $ref: "#/components/headers/ContentSecurityPolicy" }
+        Permissions-Policy: { $ref: "#/components/headers/PermissionsPolicy" }
+        Strict-Transport-Security: { $ref: "#/components/headers/HSTS" }
+      content: { application/json: { schema: { $ref: "#/components/schemas/Health" } } }
+    HealthError:
+      description: PostgreSQL is unavailable.
+      headers:
+        X-Request-ID: { $ref: "#/components/headers/RequestID" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        Content-Security-Policy: { $ref: "#/components/headers/ContentSecurityPolicy" }
+        Permissions-Policy: { $ref: "#/components/headers/PermissionsPolicy" }
+        Strict-Transport-Security: { $ref: "#/components/headers/HSTS" }
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } }
+security:
+  - sessionCookie: []
