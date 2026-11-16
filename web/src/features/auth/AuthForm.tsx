@@ -22,9 +22,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       const response =
         mode === "login" ? await api.login(value) : await api.register(value);
       auth.signedIn(response.user);
-      navigate(mode === "login" ? "/app/study/resume" : "/app", {
-        replace: true,
-      });
+      navigate("/app", { replace: true });
     } catch (e) {
       if (e instanceof RequestError) {
         for (const [name, message] of Object.entries(
@@ -53,7 +51,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         </h1>
         <p className="subtitle">
           {mode === "login"
-            ? "Продолжите заниматься с того же места."
+            ? "Войдите, чтобы открыть свою коллекцию карточек."
             : "Ваше личное пространство для карточек."}
         </p>
         {mode === "register" && (

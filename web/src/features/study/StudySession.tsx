@@ -47,7 +47,7 @@ export function StudySessionRun() {
     setError("");
     try {
       const data =
-        id === "active" || id === "resume"
+        id === "active"
           ? await api.activeStudySession()
           : await api.studySession(id);
       if (!data) {
@@ -55,7 +55,7 @@ export function StudySessionRun() {
         return;
       }
       setSession(data.session);
-      if (id === "active" || id === "resume")
+      if (id === "active")
         navigate(`/app/study/${data.session.id}`, { replace: true });
     } catch (e) {
       if (!(e instanceof RequestError && e.status === 401))
@@ -72,9 +72,7 @@ export function StudySessionRun() {
   useEffect(() => {
     let active = true;
     const request =
-      id === "active" || id === "resume"
-        ? api.activeStudySession()
-        : api.studySession(id);
+      id === "active" ? api.activeStudySession() : api.studySession(id);
     void request
       .then((data) => {
         if (!active) return;
@@ -83,7 +81,7 @@ export function StudySessionRun() {
           return;
         }
         setSession(data.session);
-        if (id === "active" || id === "resume")
+        if (id === "active")
           navigate(`/app/study/${data.session.id}`, { replace: true });
       })
       .catch((e) => {
@@ -194,10 +192,7 @@ export function StudySessionRun() {
     void answer(distance > 0 ? "correct" : "incorrect");
   };
 
-  if (missingActive)
-    return (
-      <Navigate to={id === "resume" ? "/app" : "/app/study/new"} replace />
-    );
+  if (missingActive) return <Navigate to="/app/study/new" replace />;
   if (loading)
     return <section className="content narrow">Загрузка сессии…</section>;
   if (!session)

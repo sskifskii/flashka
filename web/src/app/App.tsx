@@ -49,17 +49,9 @@ function BootstrapError() {
 }
 function GuestOnly() {
   const { user, status } = useAuth();
-  const location = useLocation();
   if (status === "loading") return <Loading />;
   if (status === "error") return <BootstrapError />;
-  return user ? (
-    <Navigate
-      to={location.pathname === "/login" ? "/app/study/resume" : "/app"}
-      replace
-    />
-  ) : (
-    <Outlet />
-  );
+  return user ? <Navigate to="/app" replace /> : <Outlet />;
 }
 function Protected() {
   const { user, status } = useAuth();

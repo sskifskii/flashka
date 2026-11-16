@@ -64,51 +64,52 @@ function folderTreeResponse() {
 }
 
 describe("authentication routes", () => {
-  it("continues an active study session after login", async () => {
-    const sessionId = crypto.randomUUID();
-    const state = {
-      id: sessionId,
-      actualCount: 2,
-      answeredCount: 1,
-      status: "active",
-      current: {
-        position: 2,
-        cardId: crypto.randomUUID(),
-        front: "Продолженный вопрос",
-        back: null,
-        revealed: false,
-      },
-    };
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const path = String(input);
-      if (path.endsWith("/auth/me")) return Promise.resolve(errorResponse(401));
-      if (path.endsWith("/auth/login") && init?.method === "POST")
-        return Promise.resolve(userResponse());
-      if (path.endsWith("/study/sessions/active"))
-        return Promise.resolve(
-          new Response(JSON.stringify({ session: state }), { status: 200 }),
+  it.each([false, true])(
+    "opens Inbox from login (already authenticated: %s) without loading study",
+    async (authenticated) => {
+      const fetchMock = vi.fn(
+        (input: RequestInfo | URL, init?: RequestInit) => {
+          const path = String(input);
+          if (path.endsWith("/auth/me"))
+            return Promise.resolve(
+              authenticated ? userResponse() : errorResponse(401),
+            );
+          if (path.endsWith("/auth/login") && init?.method === "POST")
+            return Promise.resolve(userResponse());
+          if (path.endsWith("/folders/tree"))
+            return Promise.resolve(folderTreeResponse());
+          if (path.endsWith("/cards"))
+            return Promise.resolve(
+              new Response(JSON.stringify({ items: [], nextCursor: null }), {
+                status: 200,
+              }),
+            );
+          throw new Error(`unexpected request ${path}`);
+        },
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      renderApp("/login");
+      if (!authenticated) {
+        await userEvent.type(
+          await screen.findByLabelText("Логин"),
+          "StudyUser",
         );
-      if (path.endsWith(`/study/sessions/${sessionId}`))
-        return Promise.resolve(
-          new Response(JSON.stringify({ session: state }), { status: 200 }),
-        );
-      throw new Error(`unexpected request ${path}`);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    renderApp("/login");
-    await userEvent.type(await screen.findByLabelText("Логин"), "StudyUser");
-    await userEvent.type(screen.getByLabelText("Пароль"), "long password");
-    await userEvent.click(screen.getByRole("button", { name: "Войти" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
-    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
-      "/api/v1/auth/me",
-      "/api/v1/auth/login",
-      "/api/v1/study/sessions/active",
-      `/api/v1/study/sessions/${sessionId}`,
-    ]);
-    expect(await screen.findByText("Продолженный вопрос")).toBeVisible();
-    expect(screen.getByText("2 / 2")).toBeVisible();
-  });
+        await userEvent.type(screen.getByLabelText("Пароль"), "long password");
+        await userEvent.click(screen.getByRole("button", { name: "Войти" }));
+      }
+      expect(
+        await screen.findByRole("heading", { name: "Карточки" }),
+      ).toBeVisible();
+      await waitFor(() =>
+        expect(
+          screen.getByRole("heading", { name: "Карточки" }),
+        ).toHaveTextContent("Inbox"),
+      );
+      expect(fetchMock.mock.calls.map(([input]) => String(input))).not.toEqual(
+        expect.arrayContaining([expect.stringContaining("/study/")]),
+      );
+    },
+  );
 
   it("shows the recovery warning and inline client validation", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(errorResponse(401)));
