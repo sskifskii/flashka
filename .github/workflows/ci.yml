@@ -21,7 +21,7 @@ jobs:
     env:
       DATABASE_URL: postgres://flashka:flashka@localhost:5432/flashka?sslmode=disable
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
       - uses: actions/setup-go@v5
         with: { go-version-file: go.mod, cache: true }
