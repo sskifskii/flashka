@@ -663,6 +663,13 @@ button:disabled {
 .actions button {
   margin-top: 14px;
 }
+.card-saved-actions {
+  align-items: stretch;
+  justify-content: center;
+}
+.card-saved-actions button {
+  margin-top: 0;
+}
 .danger {
   background: #b52c42;
 }
@@ -710,6 +717,9 @@ button:disabled {
   font-size: 2rem;
 }
 @media (max-width: 480px) {
+  .card-saved-actions {
+    flex-direction: column;
+  }
   .auth-page {
     padding: 0;
   }

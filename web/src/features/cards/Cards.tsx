@@ -484,7 +484,7 @@ export function NewCard() {
       <section className="content narrow state">
         <span className="spark">✓</span>
         <h1>Карточка сохранена</h1>
-        <div className="actions">
+        <div className="actions card-saved-actions">
           <button
             onClick={() => {
               setCreated(null);
