@@ -1,4 +1,19 @@
+# Local secrets (keep shareable examples tracked)
 .env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local database copies
+*.dump
+*.sql.gz
+*.sqlite
+*.sqlite3
+
 bin/
 coverage/
 web/dist/
