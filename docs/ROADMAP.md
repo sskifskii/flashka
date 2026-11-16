@@ -46,7 +46,7 @@
 - health checks и структурированное логирование;
 - валидация OpenAPI после появления первого endpoint;
 - базовые security headers и проверка отсутствия секретов.
-- Подготовка open source — `Done`: README, MIT, CONTRIBUTING, SECURITY, шаблоны Issues/PR, Dependabot и защита локальных файлов; лицензия согласована в npm и OpenAPI.
+- Подготовка open source — `Done`: README, MIT, CONTRIBUTING, SECURITY, шаблоны Issues/PR и защита локальных файлов; лицензия согласована в npm и OpenAPI. По запросу пользователя конфигурация Dependabot удалена; автоматические обновления версий отключатся после попадания изменения в `main`.
 
 ## Правило рабочих сессий
 
