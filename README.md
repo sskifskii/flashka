@@ -6,9 +6,7 @@
 
 Текстовые флеш-карточки и интервальное повторение — в браузере, на компьютере и телефоне.
 
-[![CI](https://github.com/Skifskii/flashka/actions/workflows/ci.yml/badge.svg)](https://github.com/Skifskii/flashka/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Статус: MVP](https://img.shields.io/badge/статус-MVP-d97757)](docs/ROADMAP.md)
+[![CI](https://github.com/Skifskii/flashka/actions/workflows/ci.yml/badge.svg)](https://github.com/Skifskii/flashka/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Статус: MVP](https://img.shields.io/badge/статус-MVP-d97757)](docs/ROADMAP.md)
 
 [Быстрый старт](#быстрый-старт) · [Возможности](#возможности) · [Документация](#документация) · [Участие](#участие)
 

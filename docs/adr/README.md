@@ -1,7 +1,6 @@
 # Architecture Decision Records
 
-В этой папке хранится история значимых архитектурных решений. Правила создания
-и замены ADR описаны в [DEVELOPMENT.md](../DEVELOPMENT.md).
+В этой папке хранится история значимых архитектурных решений. Правила создания и замены ADR описаны в [DEVELOPMENT.md](../DEVELOPMENT.md).
 
 ## Реестр
 
@@ -30,5 +29,4 @@ Date: YYYY-MM-DD
 ## Условия пересмотра
 ```
 
-Допустимые статусы: `Proposed`, `Accepted`, `Rejected`, `Deprecated` и
-`Superseded by ADR-NNNN`. После `Accepted` смысл документа не переписывается.
+Допустимые статусы: `Proposed`, `Accepted`, `Rejected`, `Deprecated` и `Superseded by ADR-NNNN`. После `Accepted` смысл документа не переписывается.
